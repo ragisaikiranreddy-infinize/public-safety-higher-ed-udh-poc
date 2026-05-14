@@ -1,0 +1,322 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+/* =========================================================
+   Unified Campus Safety & Operational Intelligence Platform
+   ---------------------------------------------------------
+   Public Safety / Higher Education UDH theme tokens.
+
+   Graphite-blue base + a single saturated azure accent (more
+   institutional than industrial). Four signal colors
+   (green / amber / red / blue) for ops state. Three medallion
+   layer tokens (bronze / silver / gold) for the lineage view.
+
+   Ten-tier classification scale specific to this domain:
+     public | internal | ferpa-edu-record | cji
+     title-ix-sensitive | counseling-42cfr2
+     pii | phi | juvenile | restricted-investigation
+
+   Four call-priority tokens (P1–P4). Severity tokens for
+   alerts. Information-barrier indicator color.
+   ========================================================= */
+:root {
+  /* Graphite scale — primary neutral, cool blue-grey. */
+  --graphite-950: oklch(0.16 0.012 250);
+  --graphite-900: oklch(0.22 0.013 250);
+  --graphite-800: oklch(0.30 0.014 250);
+  --graphite-700: oklch(0.40 0.015 250);
+  --graphite-600: oklch(0.50 0.014 250);
+  --graphite-500: oklch(0.60 0.012 250);
+  --graphite-400: oklch(0.72 0.010 250);
+  --graphite-300: oklch(0.83 0.008 250);
+  --graphite-200: oklch(0.91 0.006 250);
+  --graphite-100: oklch(0.96 0.004 250);
+  --graphite-50:  oklch(0.985 0.003 250);
+
+  /* Hub-azure — saturated institutional blue. CTAs, active nav, brand chips.
+     Distinct from T&L's indigo and automotive's safety-amber; reads more
+     "command center" than "industrial." */
+  --hub-700: oklch(0.40 0.16 240);
+  --hub-600: oklch(0.50 0.18 240);
+  --hub-500: oklch(0.60 0.18 240);
+  --hub-300: oklch(0.78 0.11 240);
+  --hub-100: oklch(0.94 0.05 240);
+
+  /* Aliased to "accent" so shadcn-style components keep working. */
+  --accent-700: var(--hub-700);
+  --accent-600: var(--hub-600);
+  --accent-500: var(--hub-500);
+  --accent-300: var(--hub-300);
+  --accent-100: var(--hub-100);
+
+  /* Process / business signal colors. */
+  --signal-green: oklch(0.62 0.14 155);
+  --signal-green-soft: oklch(0.94 0.04 155);
+  --signal-red: oklch(0.58 0.21 28);
+  --signal-red-soft: oklch(0.94 0.04 28);
+  --signal-amber: oklch(0.74 0.17 70);
+  --signal-amber-soft: oklch(0.96 0.04 70);
+  --signal-blue: oklch(0.58 0.14 235);
+  --signal-blue-soft: oklch(0.94 0.04 235);
+
+  /* Medallion layer colors — lineage nodes and layer badges. */
+  --layer-bronze: oklch(0.55 0.10 55);
+  --layer-bronze-soft: oklch(0.92 0.05 55);
+  --layer-silver: oklch(0.58 0.012 240);
+  --layer-silver-soft: oklch(0.93 0.008 240);
+  --layer-gold: oklch(0.62 0.13 85);
+  --layer-gold-soft: oklch(0.94 0.05 85);
+
+  /* Classification chips — 10-tier governance scale specific to higher-ed
+     public safety. Each used by the role switcher to mask cells in place. */
+  --class-public: oklch(0.62 0.14 155);
+  --class-public-soft: oklch(0.94 0.04 155);
+  --class-internal: oklch(0.58 0.14 235);
+  --class-internal-soft: oklch(0.94 0.04 235);
+  --class-ferpa: oklch(0.55 0.16 290);
+  --class-ferpa-soft: oklch(0.94 0.05 290);
+  --class-cji: oklch(0.45 0.20 25);
+  --class-cji-soft: oklch(0.94 0.05 25);
+  --class-title-ix: oklch(0.50 0.18 340);
+  --class-title-ix-soft: oklch(0.94 0.05 340);
+  --class-counseling: oklch(0.38 0.20 320);
+  --class-counseling-soft: oklch(0.93 0.05 320);
+  --class-pii: oklch(0.58 0.21 28);
+  --class-pii-soft: oklch(0.94 0.04 28);
+  --class-phi: oklch(0.50 0.18 350);
+  --class-phi-soft: oklch(0.94 0.05 350);
+  --class-juvenile: oklch(0.55 0.17 305);
+  --class-juvenile-soft: oklch(0.94 0.05 305);
+  --class-restricted-investigation: oklch(0.42 0.20 15);
+  --class-restricted-investigation-soft: oklch(0.94 0.05 15);
+
+  /* Call-priority tokens — Priority 1 (immediate) through 4 (administrative). */
+  --priority-1: oklch(0.55 0.22 25);
+  --priority-1-soft: oklch(0.94 0.05 25);
+  --priority-2: oklch(0.65 0.18 60);
+  --priority-2-soft: oklch(0.95 0.05 60);
+  --priority-3: oklch(0.60 0.14 100);
+  --priority-3-soft: oklch(0.95 0.04 100);
+  --priority-4: oklch(0.60 0.05 240);
+  --priority-4-soft: oklch(0.95 0.02 240);
+
+  /* Severity tokens — match signal palette but exposed semantically. */
+  --sev-critical: var(--signal-red);
+  --sev-critical-soft: var(--signal-red-soft);
+  --sev-warning: var(--signal-amber);
+  --sev-warning-soft: var(--signal-amber-soft);
+  --sev-info: var(--graphite-500);
+  --sev-info-soft: var(--graphite-100);
+
+  /* Information-barrier indicator — used by <BarrierIndicator/> on any
+     surface where data is being withheld due to a Title IX / Counseling /
+     BIT / Active-Investigation barrier. */
+  --barrier: oklch(0.45 0.16 300);
+  --barrier-soft: oklch(0.93 0.05 300);
+
+  /* shadcn-style semantic tokens mapped onto the graphite + hub-azure palette. */
+  --background: oklch(0.99 0.002 250);
+  --foreground: var(--graphite-900);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--graphite-900);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--graphite-900);
+  --primary: var(--graphite-900);
+  --primary-foreground: oklch(0.985 0.003 250);
+  --secondary: var(--graphite-100);
+  --secondary-foreground: var(--graphite-800);
+  --muted: var(--graphite-100);
+  --muted-foreground: var(--graphite-500);
+  --accent: var(--hub-100);
+  --accent-foreground: var(--graphite-900);
+  --destructive: var(--signal-red);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: var(--graphite-200);
+  --input: var(--graphite-200);
+  --ring: var(--hub-600);
+  --radius: 0.5rem;
+
+  /* Chart palette — selected to read well next to the hub-azure accent. */
+  --chart-1: var(--hub-600);
+  --chart-2: var(--signal-green);
+  --chart-3: var(--signal-amber);
+  --chart-4: oklch(0.58 0.14 295);
+  --chart-5: oklch(0.60 0.13 30);
+  --chart-6: var(--graphite-600);
+
+  /* Density tokens — overridden by [data-density="compact"]. */
+  --row-height: 40px;
+  --card-padding-y: 1.25rem;
+}
+
+/* Dark theme overrides — applied via [data-theme="dark"] on <html>. */
+[data-theme="dark"] {
+  --background: oklch(0.18 0.013 250);
+  --foreground: oklch(0.96 0.004 250);
+  --card: oklch(0.22 0.013 250);
+  --card-foreground: oklch(0.96 0.004 250);
+  --popover: oklch(0.22 0.013 250);
+  --popover-foreground: oklch(0.96 0.004 250);
+  --primary: oklch(0.96 0.004 250);
+  --primary-foreground: oklch(0.22 0.013 250);
+  --secondary: oklch(0.30 0.014 250);
+  --secondary-foreground: oklch(0.96 0.004 250);
+  --muted: oklch(0.30 0.014 250);
+  --muted-foreground: oklch(0.72 0.010 250);
+  --accent: oklch(0.30 0.014 250);
+  --accent-foreground: oklch(0.96 0.004 250);
+  --border: oklch(0.30 0.014 250);
+  --input: oklch(0.30 0.014 250);
+}
+
+/* Compact density — applied via [data-density="compact"] on <html>. */
+[data-density="compact"] {
+  --row-height: 32px;
+  --card-padding-y: 0.75rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-graphite-950: var(--graphite-950);
+  --color-graphite-900: var(--graphite-900);
+  --color-graphite-800: var(--graphite-800);
+  --color-graphite-700: var(--graphite-700);
+  --color-graphite-600: var(--graphite-600);
+  --color-graphite-500: var(--graphite-500);
+  --color-graphite-400: var(--graphite-400);
+  --color-graphite-300: var(--graphite-300);
+  --color-graphite-200: var(--graphite-200);
+  --color-graphite-100: var(--graphite-100);
+  --color-graphite-50:  var(--graphite-50);
+
+  --color-hub-700: var(--hub-700);
+  --color-hub-600: var(--hub-600);
+  --color-hub-500: var(--hub-500);
+  --color-hub-300: var(--hub-300);
+  --color-hub-100: var(--hub-100);
+
+  --color-accent-700: var(--accent-700);
+  --color-accent-600: var(--accent-600);
+  --color-accent-500: var(--accent-500);
+  --color-accent-300: var(--accent-300);
+  --color-accent-100: var(--accent-100);
+
+  --color-signal-green: var(--signal-green);
+  --color-signal-green-soft: var(--signal-green-soft);
+  --color-signal-red: var(--signal-red);
+  --color-signal-red-soft: var(--signal-red-soft);
+  --color-signal-amber: var(--signal-amber);
+  --color-signal-amber-soft: var(--signal-amber-soft);
+  --color-signal-blue: var(--signal-blue);
+  --color-signal-blue-soft: var(--signal-blue-soft);
+
+  --color-layer-bronze: var(--layer-bronze);
+  --color-layer-bronze-soft: var(--layer-bronze-soft);
+  --color-layer-silver: var(--layer-silver);
+  --color-layer-silver-soft: var(--layer-silver-soft);
+  --color-layer-gold: var(--layer-gold);
+  --color-layer-gold-soft: var(--layer-gold-soft);
+
+  --color-class-public: var(--class-public);
+  --color-class-public-soft: var(--class-public-soft);
+  --color-class-internal: var(--class-internal);
+  --color-class-internal-soft: var(--class-internal-soft);
+  --color-class-ferpa: var(--class-ferpa);
+  --color-class-ferpa-soft: var(--class-ferpa-soft);
+  --color-class-cji: var(--class-cji);
+  --color-class-cji-soft: var(--class-cji-soft);
+  --color-class-title-ix: var(--class-title-ix);
+  --color-class-title-ix-soft: var(--class-title-ix-soft);
+  --color-class-counseling: var(--class-counseling);
+  --color-class-counseling-soft: var(--class-counseling-soft);
+  --color-class-pii: var(--class-pii);
+  --color-class-pii-soft: var(--class-pii-soft);
+  --color-class-phi: var(--class-phi);
+  --color-class-phi-soft: var(--class-phi-soft);
+  --color-class-juvenile: var(--class-juvenile);
+  --color-class-juvenile-soft: var(--class-juvenile-soft);
+  --color-class-restricted-investigation: var(--class-restricted-investigation);
+  --color-class-restricted-investigation-soft: var(--class-restricted-investigation-soft);
+
+  --color-priority-1: var(--priority-1);
+  --color-priority-1-soft: var(--priority-1-soft);
+  --color-priority-2: var(--priority-2);
+  --color-priority-2-soft: var(--priority-2-soft);
+  --color-priority-3: var(--priority-3);
+  --color-priority-3-soft: var(--priority-3-soft);
+  --color-priority-4: var(--priority-4);
+  --color-priority-4-soft: var(--priority-4-soft);
+
+  --color-sev-critical: var(--sev-critical);
+  --color-sev-critical-soft: var(--sev-critical-soft);
+  --color-sev-warning: var(--sev-warning);
+  --color-sev-warning-soft: var(--sev-warning-soft);
+  --color-sev-info: var(--sev-info);
+  --color-sev-info-soft: var(--sev-info-soft);
+
+  --color-barrier: var(--barrier);
+  --color-barrier-soft: var(--barrier-soft);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--border);
+  }
+  html, body, #root {
+    height: 100%;
+  }
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--background);
+    color: var(--foreground);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+  code, pre, .mono {
+    font-family: var(--font-mono);
+  }
+}

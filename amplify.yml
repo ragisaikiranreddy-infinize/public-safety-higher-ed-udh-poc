@@ -1,0 +1,19 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - npm run build
+  artifacts:
+    baseDirectory: dist
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+# IMPORTANT: After first deploy, add a custom rewrite rule in the Amplify console:
+#   Source: /<*>   Target: /index.html   Type: 404→200 Rewrite
+# Without it, React Router deep-links (e.g. /incidents/INC-2026-04881) return 404.

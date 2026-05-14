@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file is the working contract for Claude Code (claude.ai/code) when editing this repository.
+This file is the working contract for Claude Code (claude.ai/code) when editing this repository. User-facing summary in [README.md](./README.md); this file is the contributor contract.
 
 ## Status: R0 (Foundation) shipped
 
@@ -27,9 +27,22 @@ If two files disagree, fix the lower-precedence file. Never silently diverge.
 - MapLibre GL + `react-map-gl` + `@turf/turf` (campus map, R4)
 - Map tiles from OpenFreeMap (no API key)
 - Path alias: `@/` → `./src/`
-- Scripts: `dev`, `build` (`tsc -b && vite build`), `preview`, `typecheck` (`tsc --noEmit -p tsconfig.app.json`)
 
-No test runner, no lint script. **Typecheck is the only automated gate.**
+## Commands
+
+- `npm install` — bootstrap (Node ≥ 20, npm ≥ 10)
+- `npm run dev` — Vite at http://localhost:5173
+- `npm run typecheck` — `tsc --noEmit -p tsconfig.app.json`. **The only automated gate** (no test runner, no lint script).
+- `npm run build` — `tsc -b && vite build`, production output to `dist/`
+- `npm run preview` — serve the built bundle locally
+- Deploy — pushed branches build via [`amplify.yml`](./amplify.yml) on AWS Amplify (SPA rewrite required, see Pitfall #10)
+
+**Release gates (manual, run before tagging a release):**
+
+```bash
+rg "20\d{2}-\d{2}-\d{2}" src mocks --glob '!time.ts'   # must return empty
+rg "from ['\"]\.\.?/?mocks" src                         # must return empty (mock-db is the sole import surface)
+```
 
 ## Architectural rules (the four sacrosanct swap-points)
 
@@ -50,6 +63,8 @@ No test runner, no lint script. **Typecheck is the only automated gate.**
 5. **Procedural time-series is seeded via `src/lib/seed.ts`** with namespace `+ ANCHOR.dayOfYear`. Stable within a session, refreshes on a new demo day.
 
 ## Folder structure
+
+This is the **target tree across R0–R9**. Folders annotated `(R1+)` / `(R3+)` / `(R5)` / etc. do not exist yet at R0 — only [src/components/ui/](src/components/ui/), [src/components/layout/](src/components/layout/), the four files under [mocks/](mocks/), and the seven files under [src/lib/](src/lib/) are committed today.
 
 ```
 public-safety-higher-education-poc/
@@ -129,6 +144,9 @@ Full table in [`docs/implementation-plan.md`](./docs/implementation-plan.md).
 11. **Information-barrier evaluation is in the data layer, not the UI.** A component can't decide whether to render Title IX content; the mock-db helper applies the barrier first.
 12. **Map building polygons must be closed.** First and last GeoPoint of each polygon array must match exactly.
 13. **Procedural data is seeded.** Never use `Math.random()` directly in fixture builders; always via `rng(namespace)`.
+14. **Pin major versions for map and charts.** `react-map-gl` stays on v7.x (v8 changes the prop API for sources/layers); `recharts` stays on v2.x (v3 ships breaking changes to axis and tooltip APIs). Bumping either is a deliberate migration, not a routine `npm update`.
+15. **Do not run the shadcn CLI.** Primitives in `src/components/ui/` are hand-written variants tuned to the 10-tier classification token palette. The CLI will overwrite them with stock versions and silently break role-scoped styling.
+16. **Date-grep regex caveat.** The release-gate `20\d{2}-\d{2}-\d{2}` is safe against current ID schemes (e.g., `INC-2026-04881`) because the middle group requires exactly 2 digits. If a new ID scheme introduces `YYYY-MM-DD`-shaped suffixes, tighten the regex with a leading word boundary before tagging the release.
 
 ## Conventions checklist (CI-grade rules, even without CI)
 
@@ -165,4 +183,4 @@ Deferred and tracked in [`docs/implementation-plan.md`](./docs/implementation-pl
 
 ## When the repo grows new structure
 
-Update this file alongside the change — replace any greenfield framing with the concrete picture. The sections worth keeping current: tech stack, swap-point invariants, time-anchor rules, ID conventions, pitfalls. The phase plan and folder map should stay accurate to what's actually committed.
+Update this file alongside the change. The sections that must stay accurate to what's actually committed: **tech stack versions**, **folder structure**, **phase-plan row for the current R**, and **pitfalls**. Swap-point invariants, time-anchor rules, and ID conventions are sticky — change them only with explicit cross-doc review.

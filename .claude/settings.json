@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(ls -la D:/udh/ 2>&1 | head -30)",
-      "Read(//d/udh/**)"
+      "Read(//d/udh/**)",
+      "mcp__atlassian__getJiraIssue"
     ]
   }
 }

@@ -4,8 +4,7 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '@/components/layout/app-shell';
 import { RoleProvider } from '@/lib/role-context';
 
-// R0 routes — Foundation. The full ~65-route tree lands incrementally:
-//   R1 — Data (catalog/sources/pipelines/quality/metrics)
+// R0/R1 routes. The remaining ~50 routes land incrementally:
 //   R2 — Pipeline live-run + Source onboarding wizard
 //   R3 — People + Incidents
 //   R4 — Campus map + Building intelligence
@@ -18,6 +17,14 @@ import { RoleProvider } from '@/lib/role-context';
 // Until each phase lands, those URLs render the NotFoundPage (404-friendly).
 
 import HomePage from '@/routes/home';
+import CatalogPage from '@/routes/catalog';
+import DatasetDetailPage from '@/routes/dataset-detail';
+import SourcesPage from '@/routes/sources';
+import SourceDetailPage from '@/routes/source-detail';
+import PipelinesPage from '@/routes/pipelines';
+import PipelineDetailPage from '@/routes/pipeline-detail';
+import QualityPage from '@/routes/quality';
+import MetricsPage from '@/routes/metrics';
 import NotFoundPage from '@/routes/not-found';
 
 import './styles/globals.css';
@@ -28,6 +35,17 @@ const router = createBrowserRouter([
     element: <AppShell />,
     children: [
       { index: true, element: <HomePage /> },
+
+      // Data (R1)
+      { path: 'catalog', element: <CatalogPage /> },
+      { path: 'catalog/:id', element: <DatasetDetailPage /> },
+      { path: 'sources', element: <SourcesPage /> },
+      { path: 'sources/:id', element: <SourceDetailPage /> },
+      { path: 'pipelines', element: <PipelinesPage /> },
+      { path: 'pipelines/:id', element: <PipelineDetailPage /> },
+      { path: 'quality', element: <QualityPage /> },
+      { path: 'metrics', element: <MetricsPage /> },
+
       { path: '*', element: <NotFoundPage /> },
     ],
   },

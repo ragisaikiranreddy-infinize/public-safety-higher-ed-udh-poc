@@ -69,8 +69,11 @@ const ROLE_CONFIGS: Record<RoleId, RoleConfig> = {
     homeKpiOrder: [
       'active-activations', 'buildings-in-lockdown', 'campaigns-sent', 'generator-alerts',
     ],
+    // Data added so the EOC duty officer can verify NWS/Rave feed health
+    // pre-activation (Sources view in particular). R8 splits the Data group
+    // so this narrows to Sources-only; for R1 we accept the full group.
     visibleSidebar: [
-      'Overview', 'EOC', 'Surveillance', 'Campus Ops', 'Compliance', 'Intelligence',
+      'Overview', 'Data', 'EOC', 'Surveillance', 'Campus Ops', 'Compliance', 'Intelligence',
     ],
     classifications: ['public', 'internal', 'cji'],
   },
@@ -104,7 +107,10 @@ const ROLE_CONFIGS: Record<RoleId, RoleConfig> = {
     homeKpiOrder: [
       'open-bit-cases', 'risk-tier-changed', 'weekly-meeting-agenda', 'barrier-hits',
     ],
-    visibleSidebar: ['Overview', 'People', 'Threat Intel', 'Conduct', 'Intelligence'],
+    // Data added so the CARE chair can diagnose a stale BIT briefing
+    // (Pipelines + Quality views surface upstream blocks like a Maxient
+    // export lag). R8 narrows to Pipelines + Quality only via the split.
+    visibleSidebar: ['Overview', 'Data', 'People', 'Threat Intel', 'Conduct', 'Intelligence'],
     classifications: ['public', 'internal', 'ferpa-edu-record', 'pii'],
   },
   'clery-officer': {
@@ -114,7 +120,10 @@ const ROLE_CONFIGS: Record<RoleId, RoleConfig> = {
     homeKpiOrder: [
       'asr-completeness', 'timely-warnings', 'csa-outstanding', 'hate-crime-review',
     ],
-    visibleSidebar: ['Overview', 'Incidents', 'Compliance', 'Intelligence'],
+    // Data added so ASR lineage trace (Catalog) + ASR mart freshness
+    // (Pipelines + Quality) are reachable from the sidebar — both are
+    // core to Clery audit workflows. R8 narrows to Lineage & Audit only.
+    visibleSidebar: ['Overview', 'Data', 'Incidents', 'Compliance', 'Intelligence'],
     classifications: ['public', 'internal', 'cji'],
   },
   ciso: {

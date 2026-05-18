@@ -933,6 +933,48 @@ export interface Insight {
 // §20 — Dashboard & conversational (R5+); §21 Governance (R8). Stubbed.
 // =========================================================================
 
+// =========================================================================
+// §21 — Governance (Information Barriers — full; rest stubbed for R8)
+// =========================================================================
+
+/** Direction the barrier blocks. */
+export type BarrierDirection = 'hard-wall' | 'soft-wall' | 'conditional' | 'one-way';
+
+/** Barrier policy — applied at every data-layer read. */
+export interface InformationBarrier {
+  id: string;                       // 'IB-TIX-TO-PD-HARD'
+  name: string;
+  description: string;
+  /** The classification(s) this barrier protects. */
+  protects: Classification[];
+  /** The role(s) this barrier blocks (or '*' for "everyone except listed allowed"). */
+  blocks: RoleId[] | '*';
+  /** The role(s) this barrier explicitly permits. */
+  allows: RoleId[];
+  direction: BarrierDirection;
+  /** Override path — what's required to break the wall. */
+  overridePath?: string;
+  /** Regulation references this barrier exists to satisfy. */
+  regulatoryHooks: RegulationId[];
+}
+
+export interface BarrierResult {
+  allowed: boolean;
+  masked: boolean;
+  barrierHit?: InformationBarrier;
+  reason: string;
+}
+
+export interface BarrierHitLogEntry {
+  id: string;
+  at: string;                       // ISO timestamp
+  actorRole: RoleId;
+  resourceKind: string;             // 'person' | 'incident' | 'bit-case' | etc.
+  resourceId: string;
+  barrierId: string;
+  outcome: 'masked' | 'denied' | 'allowed-with-override';
+}
+
 // §17 small helper: governed semantic-layer metric entries.
 export interface MetricDefinition {
   id: string;                      // 'MET-AVG-RESPONSE-TIME'

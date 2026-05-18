@@ -3,7 +3,8 @@
     "allow": [
       "Bash(ls -la D:/udh/ 2>&1 | head -30)",
       "Read(//d/udh/**)",
-      "mcp__atlassian__getJiraIssue"
+      "mcp__atlassian__getJiraIssue",
+      "PowerShell(npm run build 2>&1)"
     ]
   }
 }

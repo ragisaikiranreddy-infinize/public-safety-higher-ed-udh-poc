@@ -25,6 +25,13 @@ export { DQ_RULES } from '../../../mocks/dq-rules';
 export type { DqRuleRow } from '../../../mocks/dq-rules';
 export { METRICS } from '../../../mocks/metrics';
 export * from '../../../mocks/threads';
+export { PERSONS } from '../../../mocks/persons';
+export { OFFICERS } from '../../../mocks/officers';
+export { UNITS } from '../../../mocks/units';
+export { VEHICLES } from '../../../mocks/vehicles';
+export { NO_CONTACT_ORDERS, TRESPASS_ORDERS } from '../../../mocks/no-contact-orders';
+export { INCIDENTS } from '../../../mocks/incidents';
+export { CASES } from '../../../mocks/cases';
 
 // ----- imports for computed helpers ---------------------------------------
 import { BUILDINGS } from '../../../mocks/buildings';
@@ -38,6 +45,13 @@ import { PIPELINES } from '../../../mocks/pipelines';
 import { DQ_RULES } from '../../../mocks/dq-rules';
 import { METRICS } from '../../../mocks/metrics';
 import { getRegisteredSources } from '../source-store';
+import { PERSONS } from '../../../mocks/persons';
+import { OFFICERS } from '../../../mocks/officers';
+import { UNITS } from '../../../mocks/units';
+import { VEHICLES } from '../../../mocks/vehicles';
+import { NO_CONTACT_ORDERS, TRESPASS_ORDERS } from '../../../mocks/no-contact-orders';
+import { INCIDENTS } from '../../../mocks/incidents';
+import { CASES } from '../../../mocks/cases';
 import type {
   Building, ResidenceHall, Beat, Region, RegionId,
   Domain, DomainId,
@@ -46,6 +60,10 @@ import type {
   PipelineRun, PipelineStatus,
   LayerStatus,
   MetricDefinition,
+  Person, Officer, Unit, Vehicle,
+  Incident, IncidentStatus, CallTypeCode,
+  Case,
+  NoContactOrder, TrespassOrder,
 } from '@/lib/types';
 import type { DqRuleRow } from '../../../mocks/dq-rules';
 
@@ -294,6 +312,176 @@ export function certifiedMetrics(): MetricDefinition[] {
   return METRICS.filter((m) => m.certified);
 }
 
+// ====== Persons / officers / units / vehicles =============================
+
+export function getPerson(id: string): Person | undefined {
+  return PERSONS.find((p) => p.id === id);
+}
+
+export function getOfficer(id: string): Officer | undefined {
+  return OFFICERS.find((o) => o.id === id);
+}
+
+export function getUnit(id: string): Unit | undefined {
+  return UNITS.find((u) => u.id === id);
+}
+
+export function getVehicle(id: string): Vehicle | undefined {
+  return VEHICLES.find((v) => v.id === id);
+}
+
+export function personsByAffiliation(kind: string): Person[] {
+  return PERSONS.filter((p) => p.affiliations.includes(kind as never));
+}
+
+export function personsByResidenceBuilding(buildingId: string): Person[] {
+  return PERSONS.filter((p) => p.primaryResidenceBuildingId === buildingId);
+}
+
+export function vehiclesByPerson(personId: string): Vehicle[] {
+  return VEHICLES.filter((v) => v.registeredToPersonId === personId);
+}
+
+export function noContactOrdersByPerson(personId: string): NoContactOrder[] {
+  return NO_CONTACT_ORDERS.filter(
+    (o) => o.partyAPersonId === personId || o.partyBPersonId === personId,
+  );
+}
+
+export function trespassOrdersByPerson(personId: string): TrespassOrder[] {
+  return TRESPASS_ORDERS.filter((o) => o.subjectPersonId === personId);
+}
+
+export interface PersonIdentitySubgraphNode {
+  id: string;
+  kind: 'person' | 'identifier';
+  label: string;
+  source?: string;
+  confidence?: number;
+  matchMethod?: 'deterministic-exact' | 'deterministic-fuzzy' | 'probabilistic';
+  classification?: Classification;
+}
+
+export interface PersonIdentitySubgraph {
+  nodes: PersonIdentitySubgraphNode[];
+  edges: { from: string; to: string }[];
+}
+
+/** Build the xyflow data shape for Person 360's identity-resolution graph. */
+export function personIdentitySubgraph(personId: string): PersonIdentitySubgraph {
+  const person = getPerson(personId);
+  if (!person) return { nodes: [], edges: [] };
+  const nodes: PersonIdentitySubgraphNode[] = [
+    { id: person.id, kind: 'person', label: person.fullName || person.id },
+  ];
+  const edges: { from: string; to: string }[] = [];
+  person.identifiers.forEach((idr, i) => {
+    const nodeId = `${person.id}-id-${i}`;
+    nodes.push({
+      id: nodeId,
+      kind: 'identifier',
+      label: `${idr.kind}\n${idr.value}`,
+      source: idr.source,
+      confidence: idr.confidence,
+      matchMethod: idr.matchMethod,
+      classification: idr.classification,
+    });
+    edges.push({ from: nodeId, to: person.id });
+  });
+  return { nodes, edges };
+}
+
+// ====== Incidents / cases =================================================
+
+export function getIncident(id: string): Incident | undefined {
+  return INCIDENTS.find((i) => i.id === id);
+}
+
+export function getCase(id: string): Case | undefined {
+  return CASES.find((c) => c.id === id);
+}
+
+export function incidentsByStatus(status: IncidentStatus): Incident[] {
+  return INCIDENTS.filter((i) => i.status === status);
+}
+
+export function incidentsByBuilding(buildingId: string): Incident[] {
+  return INCIDENTS.filter((i) => i.buildingId === buildingId);
+}
+
+export function incidentsByPerson(personId: string): Incident[] {
+  return INCIDENTS.filter(
+    (i) =>
+      i.reportedByPersonId === personId ||
+      i.involvedPersonIds.includes(personId),
+  );
+}
+
+export function incidentsByOfficer(officerId: string): Incident[] {
+  return INCIDENTS.filter((i) => i.primaryOfficerId === officerId);
+}
+
+export function incidentsByCallType(code: CallTypeCode): Incident[] {
+  return INCIDENTS.filter((i) => i.callType === code);
+}
+
+export function openIncidentCount(): number {
+  return INCIDENTS.filter((i) => i.status === 'open' || i.status === 'on-scene').length;
+}
+
+export function avgResponseTimeMinutesToday(): number | null {
+  const cleared = INCIDENTS.filter(
+    (i) => i.onSceneAt && i.receivedAt && i.status === 'cleared',
+  );
+  if (!cleared.length) return null;
+  const todayCutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const recent = cleared.filter(
+    (i) => new Date(i.receivedAt).getTime() >= todayCutoff,
+  );
+  if (!recent.length) {
+    // Fall back to last 7 days
+    const sevenAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const last7 = cleared.filter(
+      (i) => new Date(i.receivedAt).getTime() >= sevenAgo,
+    );
+    if (!last7.length) return null;
+    const sum = last7.reduce((s, i) => {
+      const r = new Date(i.receivedAt).getTime();
+      const o = new Date(i.onSceneAt!).getTime();
+      return s + (o - r) / 60_000;
+    }, 0);
+    return sum / last7.length;
+  }
+  const sum = recent.reduce((s, i) => {
+    const r = new Date(i.receivedAt).getTime();
+    const o = new Date(i.onSceneAt!).getTime();
+    return s + (o - r) / 60_000;
+  }, 0);
+  return sum / recent.length;
+}
+
+export function cleryReportableCount(): number {
+  return INCIDENTS.filter((i) => i.cleryReportable).length;
+}
+
+export function incidentsByDayLastN(days: number): { date: string; count: number }[] {
+  const out: { date: string; count: number }[] = [];
+  for (let d = days - 1; d >= 0; d--) {
+    const start = Date.now() - (d + 1) * 86_400_000;
+    const end = Date.now() - d * 86_400_000;
+    const count = INCIDENTS.filter((i) => {
+      const t = new Date(i.receivedAt).getTime();
+      return t >= start && t < end;
+    }).length;
+    out.push({ date: new Date(end).toISOString().slice(0, 10), count });
+  }
+  return out;
+}
+
+export function bitCaseCount(): number {
+  return PERSONS.filter((p) => p.inOpenBITCase).length;
+}
+
 // ====== Cross-narrative integrity check ===================================
 
 import { THREAD_ANCHOR_REGISTRY } from '../../../mocks/threads';
@@ -311,8 +499,7 @@ function runIntegrityCheck() {
   if (typeof window === 'undefined') return;
   const missing: string[] = [];
   for (const id of THREAD_ANCHOR_REGISTRY.persons) {
-    // Persons fixture lands in R3 — skip silently until then.
-    void id;
+    if (!getPerson(id)) missing.push(`person: ${id}`);
   }
   for (const id of THREAD_ANCHOR_REGISTRY.buildings) {
     if (!getBuilding(id)) missing.push(`building: ${id}`);

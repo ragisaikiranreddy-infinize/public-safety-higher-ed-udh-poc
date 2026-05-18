@@ -27,6 +27,10 @@ import PipelineDetailPage from '@/routes/pipeline-detail';
 import PipelineRunPage from '@/routes/pipeline-run';
 import QualityPage from '@/routes/quality';
 import MetricsPage from '@/routes/metrics';
+import PersonsPage from '@/routes/persons';
+import PersonDetailPage from '@/routes/person-detail';
+import IncidentsPage from '@/routes/incidents';
+import IncidentDetailPage from '@/routes/incident-detail';
 import NotFoundPage from '@/routes/not-found';
 
 import './styles/globals.css';
@@ -49,6 +53,14 @@ const router = createBrowserRouter([
       { path: 'pipelines/:id/run', element: <PipelineRunPage /> },
       { path: 'quality', element: <QualityPage /> },
       { path: 'metrics', element: <MetricsPage /> },
+
+      // Incidents (R3)
+      { path: 'incidents', element: <IncidentsPage /> },
+      { path: 'incidents/:id', element: <IncidentDetailPage /> },
+
+      // People (R3)
+      { path: 'persons', element: <PersonsPage /> },
+      { path: 'persons/:id', element: <PersonDetailPage /> },
 
       { path: '*', element: <NotFoundPage /> },
     ],

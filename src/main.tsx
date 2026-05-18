@@ -21,8 +21,10 @@ import CatalogPage from '@/routes/catalog';
 import DatasetDetailPage from '@/routes/dataset-detail';
 import SourcesPage from '@/routes/sources';
 import SourceDetailPage from '@/routes/source-detail';
+import SourceNewPage from '@/routes/source-new';
 import PipelinesPage from '@/routes/pipelines';
 import PipelineDetailPage from '@/routes/pipeline-detail';
+import PipelineRunPage from '@/routes/pipeline-run';
 import QualityPage from '@/routes/quality';
 import MetricsPage from '@/routes/metrics';
 import NotFoundPage from '@/routes/not-found';
@@ -36,13 +38,15 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
 
-      // Data (R1)
+      // Data (R1 + R2)
       { path: 'catalog', element: <CatalogPage /> },
       { path: 'catalog/:id', element: <DatasetDetailPage /> },
       { path: 'sources', element: <SourcesPage /> },
+      { path: 'sources/new', element: <SourceNewPage /> },
       { path: 'sources/:id', element: <SourceDetailPage /> },
       { path: 'pipelines', element: <PipelinesPage /> },
       { path: 'pipelines/:id', element: <PipelineDetailPage /> },
+      { path: 'pipelines/:id/run', element: <PipelineRunPage /> },
       { path: 'quality', element: <QualityPage /> },
       { path: 'metrics', element: <MetricsPage /> },
 

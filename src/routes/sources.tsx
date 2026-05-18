@@ -10,25 +10,31 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
 import { ClassificationBadge } from '@/components/data-display/classification-badge';
 import { FreshnessPill } from '@/components/data-display/freshness-pill';
 import { DomainIcon } from '@/components/data-display/domain-icon';
 import { SOURCES, sourcesUnhealthy, sourcesRequiringCredentialRotation } from '@/lib/mock-db';
+import { useRegisteredSources } from '@/lib/source-store';
 
 export default function SourcesPage() {
   const [filter, setFilter] = useState('');
+  const registered = useRegisteredSources();
+
+  const allSources = useMemo(() => [...registered, ...SOURCES], [registered]);
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    if (!q) return SOURCES;
-    return SOURCES.filter(
+    if (!q) return allSources;
+    return allSources.filter(
       (s) =>
         s.id.toLowerCase().includes(q) ||
         s.name.toLowerCase().includes(q) ||
         s.vendor.toLowerCase().includes(q) ||
         s.category.includes(q),
     );
-  }, [filter]);
+  }, [filter, allSources]);
 
   const unhealthyCount = sourcesUnhealthy().length;
   const rotationDue = sourcesRequiringCredentialRotation().length;
@@ -38,11 +44,17 @@ export default function SourcesPage() {
       <PageHeader
         eyebrow="Data · Source Registry"
         title="Sources"
-        description={`${SOURCES.length} connected source systems. Each emits one or more Bronze datasets; health composite is freshness × completeness × schema stability.`}
+        description={`${allSources.length} connected source systems${registered.length > 0 ? ` (${registered.length} added this session)` : ''}. Each emits one or more Bronze datasets; health composite is freshness × completeness × schema stability.`}
         actions={
           <div className="flex items-center gap-2">
             <Badge variant="danger">{unhealthyCount} unhealthy</Badge>
             <Badge variant="warning">{rotationDue} rotations due</Badge>
+            <Link to="/sources/new">
+              <Button variant="accent" size="sm">
+                <Plus className="h-3.5 w-3.5" />
+                Add source
+              </Button>
+            </Link>
           </div>
         }
       />

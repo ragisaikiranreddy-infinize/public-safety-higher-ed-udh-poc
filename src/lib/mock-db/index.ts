@@ -24,6 +24,7 @@ export { PIPELINES, LAYER_STATUSES } from '../../../mocks/pipelines';
 export { DQ_RULES } from '../../../mocks/dq-rules';
 export type { DqRuleRow } from '../../../mocks/dq-rules';
 export { METRICS } from '../../../mocks/metrics';
+export * from '../../../mocks/threads';
 
 // ----- imports for computed helpers ---------------------------------------
 import { BUILDINGS } from '../../../mocks/buildings';
@@ -36,6 +37,7 @@ import { DATASETS } from '../../../mocks/datasets';
 import { PIPELINES } from '../../../mocks/pipelines';
 import { DQ_RULES } from '../../../mocks/dq-rules';
 import { METRICS } from '../../../mocks/metrics';
+import { getRegisteredSources } from '../source-store';
 import type {
   Building, ResidenceHall, Beat, Region, RegionId,
   Domain, DomainId,
@@ -99,7 +101,10 @@ export function domainsHealthy(): number {
 // ====== Sources ============================================================
 
 export function getSource(id: string): Source | undefined {
-  return SOURCES.find((s) => s.id === id);
+  // Check the static registry first, then wizard-registered sources.
+  const fromStatic = SOURCES.find((s) => s.id === id);
+  if (fromStatic) return fromStatic;
+  return getRegisteredSources().find((s) => s.id === id);
 }
 
 export function sourcesByDomain(domainId: DomainId): Source[] {
@@ -288,3 +293,40 @@ export function getMetric(id: string): MetricDefinition | undefined {
 export function certifiedMetrics(): MetricDefinition[] {
   return METRICS.filter((m) => m.certified);
 }
+
+// ====== Cross-narrative integrity check ===================================
+
+import { THREAD_ANCHOR_REGISTRY } from '../../../mocks/threads';
+
+/**
+ * Dev-mode integrity check. Walks every thread anchor ID exported from
+ * mocks/threads.ts and verifies that the entity it points to actually
+ * exists in its respective fixture. Logs a console.warn for anything
+ * unresolved. Runs once at module-load.
+ *
+ * Per CLAUDE.md pitfall #12, this is the cheap safety net for
+ * cross-narrative integrity in lieu of a test suite.
+ */
+function runIntegrityCheck() {
+  if (typeof window === 'undefined') return;
+  const missing: string[] = [];
+  for (const id of THREAD_ANCHOR_REGISTRY.persons) {
+    // Persons fixture lands in R3 — skip silently until then.
+    void id;
+  }
+  for (const id of THREAD_ANCHOR_REGISTRY.buildings) {
+    if (!getBuilding(id)) missing.push(`building: ${id}`);
+  }
+  for (const id of THREAD_ANCHOR_REGISTRY.pipelines) {
+    if (!getPipeline(id)) missing.push(`pipeline: ${id}`);
+  }
+  if (missing.length) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[mock-db] cross-narrative integrity: %d anchor ID(s) unresolved:\n  - %s',
+      missing.length,
+      missing.join('\n  - '),
+    );
+  }
+}
+runIntegrityCheck();

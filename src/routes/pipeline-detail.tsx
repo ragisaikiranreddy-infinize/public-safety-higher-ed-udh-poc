@@ -38,10 +38,12 @@ export default function PipelineDetailPage() {
             <LayerBadge layer={pipeline.toLayer} />
             <PipelineStatusPill status={pipeline.status} />
             <FreshnessPill lastUpdatedIso={pipeline.startedAt} />
-            <Button variant="accent" size="sm" disabled title="Live-run simulator lands in R2">
-              <Play className="h-3.5 w-3.5" />
-              Run now
-            </Button>
+            <Link to={`/pipelines/${encodeURIComponent(pipeline.id)}/run`}>
+              <Button variant="accent" size="sm">
+                <Play className="h-3.5 w-3.5" />
+                Run now
+              </Button>
+            </Link>
           </div>
         }
       />

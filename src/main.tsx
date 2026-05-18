@@ -31,6 +31,10 @@ import PersonsPage from '@/routes/persons';
 import PersonDetailPage from '@/routes/person-detail';
 import IncidentsPage from '@/routes/incidents';
 import IncidentDetailPage from '@/routes/incident-detail';
+import CamerasPage from '@/routes/cameras';
+import CameraDetailPage from '@/routes/camera-detail';
+import AccessPage from '@/routes/access';
+import BuildingDetailPage from '@/routes/building-detail';
 import NotFoundPage from '@/routes/not-found';
 
 import './styles/globals.css';
@@ -61,6 +65,12 @@ const router = createBrowserRouter([
       // People (R3)
       { path: 'persons', element: <PersonsPage /> },
       { path: 'persons/:id', element: <PersonDetailPage /> },
+
+      // Surveillance + Access (R4)
+      { path: 'cameras', element: <CamerasPage /> },
+      { path: 'cameras/:id', element: <CameraDetailPage /> },
+      { path: 'access', element: <AccessPage /> },
+      { path: 'access/buildings/:id', element: <BuildingDetailPage /> },
 
       { path: '*', element: <NotFoundPage /> },
     ],

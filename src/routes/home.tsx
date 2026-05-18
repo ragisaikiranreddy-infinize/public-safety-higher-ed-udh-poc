@@ -12,10 +12,12 @@
  *     shelterDesignatedBuildings) are working end-to-end
  */
 
+import { useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { CampusMap, DEFAULT_LAYERS } from '@/components/map/campus-map';
 import { useRole } from '@/lib/role-context';
 import {
   BUILDINGS,
@@ -280,6 +282,7 @@ const KPI_LIBRARY: Record<string, KpiSpec> = {
 
 export default function HomePage() {
   const { config } = useRole();
+  const [layers, setLayers] = useState(DEFAULT_LAYERS);
   // Role-aware: pick first 4 KPIs from the persona's homeKpiOrder.
   const kpis = config.homeKpiOrder
     .slice(0, 4)
@@ -422,26 +425,20 @@ export default function HomePage() {
           </Card>
         </div>
 
-        {/* Campus map placeholder — lands in R4 */}
+        {/* Campus map — the live hero (R4) */}
         <Card>
           <CardHeader>
-            <CardTitle>Campus map (R4)</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              Campus map
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex h-[260px] items-center justify-center rounded-md border-2 border-dashed border-[var(--border)] bg-[var(--graphite-50)]">
-              <div className="text-center">
-                <MapPin className="mx-auto h-8 w-8 text-[var(--muted-foreground)]" />
-                <div className="mt-2 text-sm font-medium text-[var(--foreground)]">
-                  MapLibre campus basemap
-                </div>
-                <div className="text-xs text-[var(--muted-foreground)]">
-                  Building polygons · Clery geography · cameras · blue lights · live incidents
-                </div>
-                <div className="mt-2 text-[11px] text-[var(--muted-foreground)]">
-                  Lands in R4 (Week 5)
-                </div>
-              </div>
-            </div>
+          <CardContent className="p-0">
+            <CampusMap
+              layers={layers}
+              onLayersChange={setLayers}
+              height={460}
+            />
           </CardContent>
         </Card>
       </div>

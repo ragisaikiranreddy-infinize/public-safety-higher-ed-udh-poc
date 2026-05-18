@@ -559,16 +559,117 @@ export interface Domain {
 }
 
 // =========================================================================
-// §9..§16 — Reserved (Sections 9–16 land in R3–R8 as fixtures grow)
+// §9 — Title IX, Conduct & Misconduct (R8) — stubbed
 // =========================================================================
-// §9  Title IX, Conduct & Misconduct (R8)
-// §10 Access control & buildings (R4)
-// §11 Surveillance (R4)
-// §12 Mass notification (R6)
-// §13 EOC & emergency (R6)
-// §14 Transportation (R8)
-// §15 Facilities/IoT (R6 light, R8 deep)
-// §16 Compliance (R7)
+
+// =========================================================================
+// §10 — Access Control & Buildings
+// =========================================================================
+
+export type ACSEventKind = 'granted' | 'denied' | 'rex' | 'forced' | 'propped' | 'actuator';
+
+export interface Door {
+  id: string;                          // 'DOR-CARTER-MAIN-S'
+  buildingId: string;
+  name: string;                        // human label (e.g. "Carter Main South")
+  location: GeoPoint;
+  kind: 'main-entrance' | 'side' | 'rear' | 'interior' | 'restricted' | 'service' | 'ada';
+  isAdaActuator: boolean;
+  postedHours?: string;                // narrative, e.g. "07:00–23:00"
+  controlledByAcs: boolean;
+  description?: string;
+}
+
+export interface ACSDoorEvent {
+  id: string;                          // 'ACS-...'
+  doorId: string;
+  buildingId: string;
+  personId?: string;                   // resolved Person Master ID (null for visitor / unknown)
+  cardholderToken: string;             // OneCard ID (pii-classified)
+  kind: ACSEventKind;
+  at: string;
+  isAfterHours: boolean;
+  isUnusualBuilding: boolean;          // cardholder rarely accesses this building
+  isAntiPassback: boolean;
+  classification: Classification;
+}
+
+export interface BuildingOccupancyEstimate {
+  buildingId: string;
+  asOf: string;                        // ISO
+  estimated: number;
+  capacity: number;
+  /** Stack of contributing factors (for the tooltip on the home-page hero). */
+  contributors: { source: string; weight: number }[];
+}
+
+export interface LockdownState {
+  id: string;
+  buildingId: string;
+  status: 'active' | 'staged' | 'released';
+  initiatedAt: string;
+  releasedAt?: string;
+  initiatedByPersonId?: string;
+  reason: string;
+  triggeredByActivationId?: string;    // EOC activation
+}
+
+// =========================================================================
+// §11 — Surveillance (Cameras + VMS events)
+// =========================================================================
+
+export type CameraKind = 'fixed' | 'ptz' | 'dome' | 'doorbell' | 'thermal' | 'lpr';
+
+export interface Camera {
+  id: string;                          // 'CAM-CARTER-N3'
+  name: string;
+  buildingId?: string;                 // null for exterior / public-property cameras
+  location: GeoPoint;
+  azimuthDeg: number;                  // direction the camera faces
+  fovDeg: number;                      // field-of-view cone width
+  kind: CameraKind;
+  vendor: string;                      // 'Milestone', 'Verkada', 'Avigilon'
+  hasAnalytics: boolean;
+  isOnline: boolean;
+  lastSeenAt: string;
+  classification: Classification;
+}
+
+export type AnalyticsKind =
+  | 'motion'
+  | 'loitering'
+  | 'person'
+  | 'vehicle'
+  | 'line-crossing'
+  | 'package-left'
+  | 'crowd';
+
+export interface CameraEvent {
+  id: string;                          // 'VEV-...'
+  cameraId: string;
+  buildingId?: string;
+  analyticKind: AnalyticsKind;
+  confidence: number;                  // 0..1
+  at: string;
+  durationSec: number;
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
+
+export interface BlueLight {
+  id: string;                          // 'BLU-QUAD-7'
+  name: string;
+  buildingId?: string;
+  location: GeoPoint;
+  isOnline: boolean;
+  lastHeartbeatAt: string;
+  isActiveCall: boolean;
+}
+
+// =========================================================================
+// §12 Mass notification (R6); §13 EOC & emergency (R6); §14 Transportation
+// (R8); §15 Facilities/IoT (R6); §16 Compliance (R7) — all stubbed.
+// =========================================================================
 
 // =========================================================================
 // §17 — Catalog / dataset / lineage / pipeline

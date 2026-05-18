@@ -32,6 +32,11 @@ export { VEHICLES } from '../../../mocks/vehicles';
 export { NO_CONTACT_ORDERS, TRESPASS_ORDERS } from '../../../mocks/no-contact-orders';
 export { INCIDENTS } from '../../../mocks/incidents';
 export { CASES } from '../../../mocks/cases';
+export { CAMERAS } from '../../../mocks/cameras';
+export { DOORS } from '../../../mocks/doors';
+export { BLUE_LIGHTS } from '../../../mocks/blue-lights';
+export { ACCESS_EVENTS, THREAD_A_AFTER_HOURS_COUNT } from '../../../mocks/access-events';
+export { CAMERA_EVENTS } from '../../../mocks/camera-events';
 
 // ----- imports for computed helpers ---------------------------------------
 import { BUILDINGS } from '../../../mocks/buildings';
@@ -52,6 +57,11 @@ import { VEHICLES } from '../../../mocks/vehicles';
 import { NO_CONTACT_ORDERS, TRESPASS_ORDERS } from '../../../mocks/no-contact-orders';
 import { INCIDENTS } from '../../../mocks/incidents';
 import { CASES } from '../../../mocks/cases';
+import { CAMERAS } from '../../../mocks/cameras';
+import { DOORS } from '../../../mocks/doors';
+import { BLUE_LIGHTS } from '../../../mocks/blue-lights';
+import { ACCESS_EVENTS } from '../../../mocks/access-events';
+import { CAMERA_EVENTS } from '../../../mocks/camera-events';
 import type {
   Building, ResidenceHall, Beat, Region, RegionId,
   Domain, DomainId,
@@ -64,6 +74,8 @@ import type {
   Incident, IncidentStatus, CallTypeCode,
   Case,
   NoContactOrder, TrespassOrder,
+  Camera, Door, BlueLight, ACSDoorEvent, CameraEvent,
+  BuildingOccupancyEstimate,
 } from '@/lib/types';
 import type { DqRuleRow } from '../../../mocks/dq-rules';
 
@@ -480,6 +492,99 @@ export function incidentsByDayLastN(days: number): { date: string; count: number
 
 export function bitCaseCount(): number {
   return PERSONS.filter((p) => p.inOpenBITCase).length;
+}
+
+// ====== Cameras / doors / blue lights / access events (R4) ================
+
+export function getCamera(id: string): Camera | undefined {
+  return CAMERAS.find((c) => c.id === id);
+}
+
+export function getDoor(id: string): Door | undefined {
+  return DOORS.find((d) => d.id === id);
+}
+
+export function getBlueLight(id: string): BlueLight | undefined {
+  return BLUE_LIGHTS.find((b) => b.id === id);
+}
+
+export function camerasByBuilding(buildingId: string): Camera[] {
+  return CAMERAS.filter((c) => c.buildingId === buildingId);
+}
+
+export function doorsByBuilding(buildingId: string): Door[] {
+  return DOORS.filter((d) => d.buildingId === buildingId);
+}
+
+export function blueLightsByBuilding(buildingId?: string): BlueLight[] {
+  if (!buildingId) return BLUE_LIGHTS;
+  return BLUE_LIGHTS.filter((b) => b.buildingId === buildingId);
+}
+
+export function cameraEventsByCamera(cameraId: string): CameraEvent[] {
+  return CAMERA_EVENTS.filter((e) => e.cameraId === cameraId);
+}
+
+export function accessEventsByBuilding(buildingId: string, limit = 200): ACSDoorEvent[] {
+  return ACCESS_EVENTS.filter((e) => e.buildingId === buildingId).slice(0, limit);
+}
+
+export function accessEventsByPerson(personId: string, limit = 200): ACSDoorEvent[] {
+  return ACCESS_EVENTS.filter((e) => e.personId === personId).slice(0, limit);
+}
+
+export function accessAnomaliesByBuilding(buildingId: string): ACSDoorEvent[] {
+  return ACCESS_EVENTS.filter(
+    (e) => e.buildingId === buildingId && (e.isAfterHours || e.isUnusualBuilding || e.isAntiPassback),
+  );
+}
+
+/** 24-hour-rolling occupancy estimate per building from access events. */
+export function buildingOccupancyEstimate(buildingId: string): BuildingOccupancyEstimate {
+  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+  const recent = ACCESS_EVENTS.filter(
+    (e) =>
+      e.buildingId === buildingId &&
+      e.kind === 'granted' &&
+      new Date(e.at).getTime() >= oneDayAgo,
+  );
+  // Decay model: unique cardholders / 2 (some still inside, some left)
+  const uniquePeople = new Set(recent.map((e) => e.personId).filter(Boolean));
+  const estimated = Math.round(uniquePeople.size * 0.55);
+  const building = BUILDINGS.find((b) => b.id === buildingId);
+  // Approx capacity from residence_halls if applicable, else 200 default
+  const rh = RESIDENCE_HALLS.find((h) => h.buildingId === buildingId);
+  const capacity = rh?.capacity ?? (building?.kind === 'athletics' ? 8000 : 600);
+  return {
+    buildingId,
+    asOf: new Date().toISOString(),
+    estimated,
+    capacity,
+    contributors: [
+      { source: 'acs.door_events_raw', weight: 0.6 },
+      { source: 'wifi.session_events_raw', weight: 0.4 },
+    ],
+  };
+}
+
+/** Hour-of-day swipe-volume histogram for a building (last 30d). */
+export function buildingHourlySwipes(buildingId: string): { hour: number; count: number; anomalyCount: number }[] {
+  const buckets: { count: number; anomalyCount: number }[] = Array.from({ length: 24 }, () => ({ count: 0, anomalyCount: 0 }));
+  for (const e of ACCESS_EVENTS) {
+    if (e.buildingId !== buildingId) continue;
+    const h = new Date(e.at).getHours();
+    buckets[h].count++;
+    if (e.isAfterHours || e.isUnusualBuilding || e.isAntiPassback) buckets[h].anomalyCount++;
+  }
+  return buckets.map((b, hour) => ({ hour, ...b }));
+}
+
+export function camerasOnlineCount(): number {
+  return CAMERAS.filter((c) => c.isOnline).length;
+}
+
+export function blueLightsOfflineCount(): number {
+  return BLUE_LIGHTS.filter((b) => !b.isOnline).length;
 }
 
 // ====== Cross-narrative integrity check ===================================

@@ -1,22 +1,16 @@
 /**
  * Command Center — the hero screen.
  *
- * R0 ships a foundation version: KPI strip + role-aware reshape + roadmap
- * placeholders for the campus map and live ticker (both land in R4).
- *
- * This page demonstrates the spine already works:
- *   - role switcher in header reshapes the KPI tile order
- *   - sidebar groups appear/disappear per persona
- *   - PageHeader + Card primitives + theme tokens
- *   - mock-db helpers (residentialBuildingCount, totalResidentialOccupancy,
- *     shelterDesignatedBuildings) are working end-to-end
+ * Role-aware KPI strip (top 4 from the persona's homeKpiOrder), live EOC
+ * banner, the campus map, and supporting context (geography, residential
+ * capacity, classification taxonomy). Each KPI is computed at render time
+ * from the mock-db helpers — no static placeholders.
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { CampusMap, DEFAULT_LAYERS } from '@/components/map/campus-map';
 import { useRole } from '@/lib/role-context';
 import {
@@ -24,13 +18,32 @@ import {
   RESIDENCE_HALLS,
   BEATS,
   REGIONS,
+  UNITS,
+  INCIDENTS,
+  BIT_CASES,
+  TITLE_IX_CASES,
+  SANCTIONS,
+  CONDUCT_CASES,
+  RUNBOOK_EXECUTIONS,
+  NOTIFICATION_CAMPAIGNS,
   shelterDesignatedBuildings,
   totalResidentialOccupancy,
   totalResidentialCapacity,
   activeWeatherAlerts,
   activeEOCActivations,
+  openIncidentCount,
+  avgResponseTimeMinutesToday,
+  openBITCasesCount,
+  openConductCasesCount,
+  sanctionsDueCount,
+  sourcesUnhealthy,
+  generatorsByMode,
+  notificationDeliveryRollup30d,
+  cleryReportableCount,
 } from '@/lib/mock-db';
-import { currentSemester, currentShift } from '@/lib/time';
+import { getBarrierHits } from '@/lib/information-barriers';
+import { currentSemester, currentShift, ANCHOR, hoursAgo } from '@/lib/time';
+import { formatMinutes } from '@/lib/utils';
 import {
   Activity,
   Building2,
@@ -40,259 +53,416 @@ import {
   Sparkles,
   AlertOctagon,
   Siren,
+  Radio,
+  Zap,
+  Truck,
+  ScrollText,
+  Lock,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
+// =========================================================================
+// KPI library — computed live from mock-db
+// =========================================================================
 
 interface KpiSpec {
   id: string;
   label: string;
-  value: string;
   icon: React.ElementType;
-  hint: string;
+  /** Live value. Returns either a numeric/string display or null (then the
+   *  card renders "—" + the hint). */
+  compute: () => { value: string; hint: string; href?: string; tone?: 'critical' | 'warning' | 'good' };
+}
+
+/** Count incidents received in the past 24h. */
+function incidentsLast24h(): number {
+  const cutoff = hoursAgo(24).getTime();
+  return INCIDENTS.filter((i) => new Date(i.receivedAt).getTime() >= cutoff).length;
+}
+
+/** Count notification campaigns sent in the past 24h. */
+function campaignsLast24h(): number {
+  const cutoff = hoursAgo(24).getTime();
+  return NOTIFICATION_CAMPAIGNS.filter(
+    (c) => c.sentAt && new Date(c.sentAt).getTime() >= cutoff,
+  ).length;
+}
+
+/** Count BIT cases whose trend is rising or falling (i.e. changed) in 7d window.
+ *  We treat any case with a `lastReviewedAt` inside 7d AND riskTrend≠stable as “changed”. */
+function bitCasesWithChangedTier7d(): number {
+  const cutoff = ANCHOR.getTime() - 7 * 24 * 60 * 60 * 1000;
+  return BIT_CASES.filter(
+    (c) =>
+      new Date(c.lastReviewedAt).getTime() >= cutoff &&
+      c.riskTrend !== 'stable' &&
+      c.status !== 'closed',
+  ).length;
 }
 
 const KPI_LIBRARY: Record<string, KpiSpec> = {
+  // ---------- Operational ops (R3 + R6) ----------
   'open-incidents': {
     id: 'open-incidents',
     label: 'Open incidents',
-    value: '— ',
     icon: Activity,
-    hint: 'Lights up in R3 with CAD fixtures.',
+    compute: () => {
+      const n = openIncidentCount();
+      return { value: `${n}`, hint: 'open + on-scene + pending', href: '/incidents' };
+    },
   },
   'avg-response-time': {
     id: 'avg-response-time',
     label: 'Avg response (today)',
-    value: '— ',
     icon: Activity,
-    hint: 'Lights up in R3 with CAD fixtures.',
-  },
-  'active-runbooks': {
-    id: 'active-runbooks',
-    label: 'Active runbooks',
-    value: '— ',
-    icon: ShieldCheck,
-    hint: 'Lights up in R6 with EOC thread.',
-  },
-  'open-bit-cases': {
-    id: 'open-bit-cases',
-    label: 'Open BIT / CARE cases',
-    value: '— ',
-    icon: Sparkles,
-    hint: 'Lights up in R5 with Thread A.',
+    compute: () => {
+      const m = avgResponseTimeMinutesToday();
+      return {
+        value: m === null ? '—' : formatMinutes(m),
+        hint: m === null ? 'no priority-1/2 incidents today' : 'priority 1 + 2 incidents',
+        href: '/incidents',
+        tone: m !== null && m > 6 ? 'warning' : 'good',
+      };
+    },
   },
   'calls-in-queue': {
     id: 'calls-in-queue',
     label: 'Calls in queue',
-    value: '— ',
     icon: Activity,
-    hint: 'Lights up in R3.',
+    compute: () => {
+      const n = INCIDENTS.filter((i) => i.status === 'open' || i.status === 'pending').length;
+      return { value: `${n}`, hint: 'open + pending dispatch', href: '/incidents' };
+    },
   },
   'units-available': {
     id: 'units-available',
     label: 'Units available',
-    value: '— ',
-    icon: Activity,
-    hint: 'Lights up in R3.',
+    icon: Truck,
+    compute: () => {
+      const avail = UNITS.filter((u) => u.status === 'available').length;
+      return { value: `${avail} / ${UNITS.length}`, hint: 'patrol + supervisor + specialty' };
+    },
   },
   'live-event-count': {
     id: 'live-event-count',
-    label: 'Live events (rolling)',
-    value: '— ',
+    label: 'Incidents (24h)',
     icon: Activity,
-    hint: 'Lights up in R3.',
+    compute: () => {
+      const n = incidentsLast24h();
+      return { value: `${n}`, hint: 'received in the last 24 hours', href: '/incidents' };
+    },
+  },
+
+  // ---------- EOC + Notifications + Facilities (R6) ----------
+  'active-runbooks': {
+    id: 'active-runbooks',
+    label: 'Active runbooks',
+    icon: ScrollText,
+    compute: () => {
+      const n = RUNBOOK_EXECUTIONS.filter(
+        (x) => x.status === 'in-progress' || x.status === 'queued',
+      ).length;
+      return { value: `${n}`, hint: 'in-progress + queued', href: '/runbooks' };
+    },
   },
   'active-activations': {
     id: 'active-activations',
     label: 'EOC activations',
-    value: '— ',
-    icon: ShieldCheck,
-    hint: 'Lights up in R6 with Thread B.',
+    icon: Siren,
+    compute: () => {
+      const list = activeEOCActivations();
+      const tone = list.some((a) => a.level === 'full') ? 'critical' : list.length > 0 ? 'warning' : 'good';
+      return { value: `${list.length}`, hint: list.length === 0 ? 'no active activations' : list.map((a) => a.level).join(' · '), href: '/eoc', tone };
+    },
   },
   'buildings-in-lockdown': {
     id: 'buildings-in-lockdown',
     label: 'Buildings in lockdown',
-    value: '— ',
-    icon: ShieldCheck,
-    hint: 'Lights up in R6.',
+    icon: Lock,
+    compute: () => {
+      const total = activeEOCActivations().reduce((s, a) => s + a.lockdownIds.length, 0);
+      return { value: `${total}`, hint: total === 0 ? 'normal access posture' : 'across active activations', href: '/access/lockdowns', tone: total > 0 ? 'warning' : 'good' };
+    },
   },
   'campaigns-sent': {
     id: 'campaigns-sent',
-    label: 'Notifications sent today',
-    value: '— ',
-    icon: ShieldCheck,
-    hint: 'Lights up in R6.',
+    label: 'Notifications sent (24h)',
+    icon: Radio,
+    compute: () => {
+      const n = campaignsLast24h();
+      return { value: `${n}`, hint: 'mass-notification campaigns', href: '/notifications' };
+    },
   },
   'generator-alerts': {
     id: 'generator-alerts',
-    label: 'Generator alerts',
-    value: '— ',
-    icon: ShieldCheck,
-    hint: 'Lights up in R6.',
+    label: 'Generators not normal',
+    icon: Zap,
+    compute: () => {
+      const counts = generatorsByMode();
+      const failed = counts.failed ?? 0;
+      const onBattery = counts['on-battery'] ?? 0;
+      const onGen = counts['on-generator'] ?? 0;
+      const total = failed + onBattery + onGen;
+      return {
+        value: `${total}`,
+        hint: failed > 0 ? `${failed} failed` : total === 0 ? 'all generators normal' : 'check facilities',
+        href: '/facilities',
+        tone: failed > 0 ? 'critical' : total > 0 ? 'warning' : 'good',
+      };
+    },
+  },
+
+  // ---------- Threat Intel + Conduct + Title IX (R5) ----------
+  'open-bit-cases': {
+    id: 'open-bit-cases',
+    label: 'Open BIT / CARE cases',
+    icon: Sparkles,
+    compute: () => {
+      const n = openBITCasesCount();
+      const critical = BIT_CASES.filter((c) => c.riskTier === 'critical' && c.status !== 'closed').length;
+      const elevated = BIT_CASES.filter((c) => c.riskTier === 'elevated' && c.status !== 'closed').length;
+      return {
+        value: `${n}`,
+        hint: critical > 0 ? `${critical} critical · ${elevated} elevated` : `${elevated} elevated`,
+        href: '/bit',
+        tone: critical > 0 ? 'critical' : elevated > 0 ? 'warning' : 'good',
+      };
+    },
+  },
+  'risk-tier-changed': {
+    id: 'risk-tier-changed',
+    label: 'Risk tier moved (7d)',
+    icon: Sparkles,
+    compute: () => {
+      const n = bitCasesWithChangedTier7d();
+      return { value: `${n}`, hint: 'rising or falling since last review', href: '/bit' };
+    },
+  },
+  'weekly-meeting-agenda': {
+    id: 'weekly-meeting-agenda',
+    label: 'BIT agenda — this week',
+    icon: ScrollText,
+    compute: () => {
+      const cutoff = ANCHOR.getTime() + 7 * 24 * 60 * 60 * 1000;
+      const dueThisWeek = BIT_CASES.filter(
+        (c) => c.status !== 'closed' && new Date(c.nextReviewDueAt).getTime() <= cutoff,
+      ).length;
+      return { value: `${dueThisWeek}`, hint: 'cases up for review within 7 days', href: '/bit' };
+    },
   },
   'open-conduct-cases': {
     id: 'open-conduct-cases',
     label: 'Open conduct cases',
-    value: '— ',
     icon: Sparkles,
-    hint: 'Lights up in R8 with Module 5B.',
+    compute: () => {
+      const n = openConductCasesCount();
+      return { value: `${n}`, hint: 'substance + residential (R5)' };
+    },
   },
   'substance-pattern-alerts': {
     id: 'substance-pattern-alerts',
-    label: 'Substance-pattern alerts',
-    value: '— ',
+    label: 'Substance cases (30d)',
     icon: Sparkles,
-    hint: 'Lights up in R8.',
+    compute: () => {
+      const cutoff = ANCHOR.getTime() - 30 * 24 * 60 * 60 * 1000;
+      const recent = CONDUCT_CASES.filter(
+        (c) => c.subtype === 'substance' && new Date(c.openedAt).getTime() >= cutoff,
+      ).length;
+      return { value: `${recent}`, hint: 'substance-subtype conduct cases opened' };
+    },
   },
   'sanctions-due': {
     id: 'sanctions-due',
-    label: 'Sanctions due (7d)',
-    value: '— ',
+    label: 'Sanctions due',
     icon: Sparkles,
-    hint: 'Lights up in R8.',
+    compute: () => {
+      const n = sanctionsDueCount();
+      const overdue = SANCTIONS.filter((s) => s.status === 'overdue').length;
+      return {
+        value: `${n}`,
+        hint: overdue > 0 ? `${overdue} overdue` : 'pending + active',
+        tone: overdue > 0 ? 'warning' : 'good',
+      };
+    },
   },
+  // ---------- Title IX (walled) ----------
   'open-title-ix-cases': {
     id: 'open-title-ix-cases',
     label: 'Open Title IX cases',
-    value: '— ',
     icon: Sparkles,
-    hint: 'Walled. Visible only in Title IX role.',
+    compute: () => {
+      const n = TITLE_IX_CASES.filter((c) => c.phase !== 'closed').length;
+      return { value: `${n}`, hint: 'across all phases', href: '/title-ix' };
+    },
   },
   'supportive-measures-active': {
     id: 'supportive-measures-active',
     label: 'Supportive measures active',
-    value: '— ',
-    icon: Sparkles,
-    hint: 'Walled.',
+    icon: ShieldCheck,
+    compute: () => {
+      const n = TITLE_IX_CASES.filter((c) => c.phase !== 'closed').reduce(
+        (s, c) => s + c.supportiveMeasures.length,
+        0,
+      );
+      return { value: `${n}`, hint: 'across open cases', href: '/title-ix' };
+    },
   },
   'statutory-deadlines': {
     id: 'statutory-deadlines',
-    label: 'Statutory deadlines approaching',
-    value: '— ',
+    label: 'Statutory deadlines (14d)',
     icon: Sparkles,
-    hint: 'Walled.',
+    compute: () => {
+      const cutoff = ANCHOR.getTime() + 14 * 24 * 60 * 60 * 1000;
+      const due = TITLE_IX_CASES.filter(
+        (c) => c.determinationDueAt && new Date(c.determinationDueAt).getTime() <= cutoff,
+      ).length;
+      return { value: `${due}`, hint: 'determination due within 14 days', tone: due > 0 ? 'warning' : 'good' };
+    },
   },
   'annual-stats': {
     id: 'annual-stats',
-    label: 'Annual stats progress',
-    value: '— ',
-    icon: Sparkles,
-    hint: 'Walled.',
+    label: 'Annual stats (Clery)',
+    icon: ShieldCheck,
+    compute: () => ({ value: '—', hint: 'ASR workbench lands in R7' }),
   },
-  'risk-tier-changed': {
-    id: 'risk-tier-changed',
-    label: 'Risk tier changed (7d)',
-    value: '— ',
-    icon: Sparkles,
-    hint: 'Lights up in R5.',
-  },
-  'weekly-meeting-agenda': {
-    id: 'weekly-meeting-agenda',
-    label: 'Weekly meeting agenda',
-    value: '— ',
-    icon: Sparkles,
-    hint: 'Lights up in R5.',
-  },
+
+  // ---------- Governance / Trust (CISO) ----------
   'barrier-hits': {
     id: 'barrier-hits',
-    label: 'Barrier hits today',
-    value: '— ',
+    label: 'Barrier hits (session)',
     icon: ShieldCheck,
-    hint: 'Lights up in R3 with role-context.',
-  },
-  'asr-completeness': {
-    id: 'asr-completeness',
-    label: 'ASR build completeness',
-    value: '— ',
-    icon: ShieldCheck,
-    hint: 'Lights up in R7 with Thread C.',
-  },
-  'timely-warnings': {
-    id: 'timely-warnings',
-    label: 'Timely Warnings (week)',
-    value: '— ',
-    icon: ShieldCheck,
-    hint: 'Lights up in R7.',
-  },
-  'csa-outstanding': {
-    id: 'csa-outstanding',
-    label: 'CSA reports outstanding',
-    value: '— ',
-    icon: ShieldCheck,
-    hint: 'Lights up in R7.',
-  },
-  'hate-crime-review': {
-    id: 'hate-crime-review',
-    label: 'Hate-crime review queue',
-    value: '— ',
-    icon: ShieldCheck,
-    hint: 'Lights up in R7.',
-  },
-  'sources-unhealthy': {
-    id: 'sources-unhealthy',
-    label: 'Sources unhealthy',
-    value: '— ',
-    icon: ShieldCheck,
-    hint: 'Lights up in R1 with source registry.',
+    compute: () => {
+      const n = getBarrierHits().length;
+      return { value: `${n}`, hint: 'logged this session — see /audit (R8)' };
+    },
   },
   'barrier-hits-today': {
     id: 'barrier-hits-today',
     label: 'Barrier hits (24h)',
-    value: '— ',
     icon: ShieldCheck,
-    hint: 'Lights up in R3.',
+    compute: () => {
+      const cutoff = hoursAgo(24).getTime();
+      const recent = getBarrierHits().filter((h) => new Date(h.at).getTime() >= cutoff).length;
+      return { value: `${recent}`, hint: 'masked / denied / overridden' };
+    },
+  },
+  'sources-unhealthy': {
+    id: 'sources-unhealthy',
+    label: 'Sources unhealthy',
+    icon: ShieldCheck,
+    compute: () => {
+      const list = sourcesUnhealthy();
+      return {
+        value: `${list.length}`,
+        hint: 'composite health < 90',
+        href: '/sources',
+        tone: list.length > 5 ? 'warning' : 'good',
+      };
+    },
   },
   'cji-access-events': {
     id: 'cji-access-events',
-    label: 'CJI access events',
-    value: '— ',
+    label: 'CJI events (24h)',
     icon: ShieldCheck,
-    hint: 'Lights up in R8 with governance.',
+    compute: () => {
+      const cutoff = hoursAgo(24).getTime();
+      const n = INCIDENTS.filter(
+        (i) => i.classification === 'cji' && new Date(i.receivedAt).getTime() >= cutoff,
+      ).length;
+      return { value: `${n}`, hint: 'CJI-classified incidents received' };
+    },
   },
   'dr-posture': {
     id: 'dr-posture',
     label: 'DR posture',
-    value: '— ',
     icon: ShieldCheck,
-    hint: 'Lights up in R8.',
+    compute: () => ({ value: '—', hint: 'governance panel lands in R8' }),
   },
+
+  // ---------- Executive (aggregate) ----------
   'incidents-ytd': {
     id: 'incidents-ytd',
-    label: 'Incidents YTD',
-    value: '— ',
+    label: 'Incidents (rolling 12mo)',
     icon: Activity,
-    hint: 'Lights up in R3.',
+    compute: () => ({ value: `${INCIDENTS.length}`, hint: 'across all classifications', href: '/incidents' }),
   },
   'bit-cases-trend': {
     id: 'bit-cases-trend',
-    label: 'BIT cases trend',
-    value: '— ',
+    label: 'BIT cases · open',
     icon: Sparkles,
-    hint: 'Lights up in R5.',
+    compute: () => {
+      const n = openBITCasesCount();
+      return { value: `${n}`, hint: 'across 4 NaBITA tiers', href: '/bit' };
+    },
   },
   'clery-audit-posture': {
     id: 'clery-audit-posture',
-    label: 'Clery audit posture',
-    value: '— ',
+    label: 'Clery — reportable (12mo)',
     icon: ShieldCheck,
-    hint: 'Lights up in R7.',
+    compute: () => ({ value: `${cleryReportableCount()}`, hint: 'Clery-reportable incidents (full audit in R7)' }),
   },
   'campus-safety-score': {
     id: 'campus-safety-score',
     label: 'Campus safety score',
-    value: '— ',
     icon: ShieldCheck,
-    hint: 'Lights up in R9.',
+    compute: () => ({ value: '—', hint: 'composite score lands in R9' }),
   },
+
+  // ---------- Compliance (Clery officer) — R7 ----------
+  'asr-completeness': {
+    id: 'asr-completeness',
+    label: 'ASR build completeness',
+    icon: ShieldCheck,
+    compute: () => ({ value: '—', hint: 'ASR workbench lands in R7' }),
+  },
+  'timely-warnings': {
+    id: 'timely-warnings',
+    label: 'Timely Warnings (week)',
+    icon: ShieldCheck,
+    compute: () => ({ value: '—', hint: 'Timely Warning ledger lands in R7' }),
+  },
+  'csa-outstanding': {
+    id: 'csa-outstanding',
+    label: 'CSA reports outstanding',
+    icon: ShieldCheck,
+    compute: () => ({ value: '—', hint: 'CSA register lands in R7' }),
+  },
+  'hate-crime-review': {
+    id: 'hate-crime-review',
+    label: 'Hate-crime review queue',
+    icon: ShieldCheck,
+    compute: () => ({ value: '—', hint: 'Bias review queue lands in R7' }),
+  },
+};
+
+// =========================================================================
+// Page
+// =========================================================================
+
+const TONE_BG: Record<'critical' | 'warning' | 'good', string> = {
+  critical: 'bg-[var(--signal-red-soft)] ring-1 ring-[color-mix(in_oklch,var(--signal-red)_30%,white)]',
+  warning: 'bg-[var(--signal-amber-soft)] ring-1 ring-[color-mix(in_oklch,var(--signal-amber)_30%,white)]',
+  good: '',
+};
+
+const TONE_VALUE: Record<'critical' | 'warning' | 'good', string> = {
+  critical: 'text-[var(--signal-red)]',
+  warning: 'text-[oklch(0.42_0.13_70)]',
+  good: 'text-[var(--foreground)]',
 };
 
 export default function HomePage() {
   const { config } = useRole();
   const [layers, setLayers] = useState(DEFAULT_LAYERS);
-  // Role-aware: pick first 4 KPIs from the persona's homeKpiOrder.
-  const kpis = config.homeKpiOrder
-    .slice(0, 4)
-    .map((id) => KPI_LIBRARY[id])
-    .filter(Boolean);
+
+  const kpis = useMemo(
+    () =>
+      config.homeKpiOrder
+        .slice(0, 4)
+        .map((id) => KPI_LIBRARY[id])
+        .filter(Boolean),
+    [config.homeKpiOrder],
+  );
 
   const totalBuildings = BUILDINGS.length;
   const totalResHalls = RESIDENCE_HALLS.length;
@@ -317,8 +487,10 @@ export default function HomePage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((k) => {
             const Icon = k.icon;
-            return (
-              <Card key={k.id}>
+            const computed = k.compute();
+            const tone = computed.tone ?? 'good';
+            const card = (
+              <Card className={tone !== 'good' ? TONE_BG[tone] : undefined}>
                 <CardContent className="p-5">
                   <div className="mb-3 flex items-center justify-between">
                     <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
@@ -326,51 +498,29 @@ export default function HomePage() {
                     </div>
                     <Icon className="h-4 w-4 text-[var(--muted-foreground)]" />
                   </div>
-                  <div className="font-display text-2xl font-semibold text-[var(--foreground)]">
-                    {k.value}
+                  <div className={`font-display text-2xl font-semibold ${TONE_VALUE[tone]}`}>
+                    {computed.value}
                   </div>
                   <div className="mt-2 text-[11px] text-[var(--muted-foreground)]">
-                    {k.hint}
+                    {computed.hint}
                   </div>
                 </CardContent>
               </Card>
             );
+            return computed.href ? (
+              <Link key={k.id} to={computed.href} className="transition-opacity hover:opacity-90">
+                {card}
+              </Link>
+            ) : (
+              <div key={k.id}>{card}</div>
+            );
           })}
         </div>
 
-        {/* Foundation status — what's working at end of R0 */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>R0 — Foundation status</CardTitle>
-              <Badge variant="success">All systems green</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              <Item ok label="Vite + React 19 + TypeScript 5.7" />
-              <Item ok label="Tailwind v4 (CSS-first) with public-safety tokens" />
-              <Item ok label="React Router v7 (data router)" />
-              <Item ok label="Role-context provider (9 personas)" />
-              <Item ok label="Sidebar + Header + AppShell" />
-              <Item ok label="mock-db swap-point (seed: regions, buildings, residence halls, beats)" />
-              <Item ok label="ANCHOR-based time discipline" />
-              <Item ok label="mulberry32 deterministic RNG" />
-              <Item ok label="GeoPoint / GeoPolygon kit (geo.ts)" />
-              <Item ok label="Types §1–§7 stubbed (~80 entities catalog target)" />
-            </div>
-            <Separator />
-            <p className="text-xs leading-relaxed text-[var(--muted-foreground)]">
-              <strong className="font-semibold text-[var(--foreground)]">Next up — R1:</strong>{' '}
-              Medallion catalog (~45 datasets), source registry (~22 sources),
-              pipelines list with five-tab detail, xyflow lineage graph, six-dimension DQ
-              console. Then R2 wires the live pipeline state machine + 8-step source
-              onboarding wizard.
-            </p>
-          </CardContent>
-        </Card>
+        {/* Live activity panel — replaces the R0 foundation card */}
+        <LiveActivityPanel />
 
-        {/* Live mock-db demo — proves the spine works */}
+        {/* Supporting context — geography, residential capacity, classification taxonomy */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Card>
             <CardHeader className="pb-3">
@@ -415,7 +565,7 @@ export default function HomePage() {
             </CardHeader>
             <CardContent>
               <p className="mb-3 text-xs text-[var(--muted-foreground)]">
-                10-tier scale enforced at row + column level (lights up in R3+).
+                10-tier scale enforced at row + column level via Information Barriers.
               </p>
               <div className="flex flex-wrap gap-1.5">
                 <Badge variant="public">public</Badge>
@@ -454,17 +604,120 @@ export default function HomePage() {
   );
 }
 
-function Item({ ok, label }: { ok: boolean; label: string }) {
+// =========================================================================
+// Live activity panel — six tiles summarizing the current operational state
+// =========================================================================
+
+function LiveActivityPanel() {
+  const incidents24h = incidentsLast24h();
+  const openIncidents = openIncidentCount();
+  const openBIT = openBITCasesCount();
+  const activeAct = activeEOCActivations().length;
+  const campaigns24h = campaignsLast24h();
+  const gens = generatorsByMode();
+  const genFailed = gens.failed ?? 0;
+  const rollup = notificationDeliveryRollup30d();
+  const barrierHitsSession = getBarrierHits().length;
+
   return (
-    <div className="flex items-center gap-2">
-      <span
-        className={`inline-block h-2 w-2 rounded-full ${
-          ok ? 'bg-[var(--signal-green)]' : 'bg-[var(--graphite-300)]'
-        }`}
-      />
-      <span>{label}</span>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Live activity
+          </CardTitle>
+          <Badge variant={activeAct > 0 || genFailed > 0 ? 'warning' : 'success'}>
+            {activeAct > 0 ? `${activeAct} activation${activeAct === 1 ? '' : 's'} active` : 'normal operations'}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-3 lg:grid-cols-6">
+          <Stat
+            label="Incidents · 24h"
+            value={incidents24h.toLocaleString()}
+            sub={`${openIncidents} open right now`}
+            href="/incidents"
+          />
+          <Stat
+            label="BIT cases · open"
+            value={`${openBIT}`}
+            sub="across 4 NaBITA tiers"
+            href="/bit"
+          />
+          <Stat
+            label="EOC activations"
+            value={`${activeAct}`}
+            sub={activeAct === 0 ? 'none active' : 'partial / full / monitoring'}
+            href="/eoc"
+            tone={activeAct > 0 ? 'warn' : 'good'}
+          />
+          <Stat
+            label="Notifications · 24h"
+            value={`${campaigns24h}`}
+            sub={`${(rollup.deliveryRate * 100).toFixed(1)}% delivery rate (30d)`}
+            href="/notifications"
+          />
+          <Stat
+            label="Generators · not normal"
+            value={`${genFailed + (gens['on-battery'] ?? 0) + (gens['on-generator'] ?? 0)}`}
+            sub={genFailed > 0 ? `${genFailed} failed` : 'all generators normal'}
+            href="/facilities"
+            tone={genFailed > 0 ? 'critical' : 'good'}
+          />
+          <Stat
+            label="Barrier hits · session"
+            value={`${barrierHitsSession}`}
+            sub="masked / denied / overridden"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// =========================================================================
+// Helpers
+// =========================================================================
+
+function Stat({
+  label,
+  value,
+  sub,
+  href,
+  tone,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  href?: string;
+  tone?: 'good' | 'warn' | 'critical';
+}) {
+  const valueClass =
+    tone === 'critical' ? 'text-[var(--signal-red)]'
+    : tone === 'warn' ? 'text-[oklch(0.42_0.13_70)]'
+    : 'text-[var(--foreground)]';
+
+  const inner = (
+    <div className="space-y-0.5">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+        {label}
+      </div>
+      <div className={`font-display text-xl font-semibold tabular-nums ${valueClass}`}>
+        {value}
+      </div>
+      <div className="text-[10px] text-[var(--muted-foreground)]">{sub}</div>
     </div>
   );
+  if (href) {
+    return (
+      <Link to={href} className="transition-opacity hover:opacity-80">
+        {inner}
+      </Link>
+    );
+  }
+  return inner;
 }
 
 function Row({

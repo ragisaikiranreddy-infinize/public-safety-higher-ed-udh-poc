@@ -19,8 +19,13 @@
  *   - cleryCopilot(prompt)              → compliance copilot (canned)
  *   - redactFoia(requestId)             → AI-assisted redaction preview
  *
+ * R8 surface — Module 5B Conduct + Governance:
+ *   - conductCopilot(prompt)            → conduct copilot (canned)
+ *   - amnestyAssist(caseId)             → Medical Amnesty determination aid
+ *   - hazingClassifier(orgCaseId)       → Stop Campus Hazing classifier
+ *   - ferpaDecisionAid(caseId)          → FERPA §99.31 decision aid
+ *
  * Later phases extend:
- *   R8  — conductCopilot, parentalNotifFerpaAid, hazingClassifier, amnestyAid
  *   R9  — askPlatform, cohortFromNL, buildDashboardFromNL
  */
 
@@ -923,3 +928,210 @@ export function redactFoia(requestId: string): AIRedactionResult {
 void THREAD_C_TRIGGERING_INCIDENT_ID;
 void THREAD_C_ASR_LINE_ID;
 void THREAD_C_FOIA_REQUEST_ID;
+
+// =========================================================================
+// conductCopilot — Module 5B conversational copilot (R8)
+// =========================================================================
+
+export interface AIConductCopilotResult {
+  available: boolean;
+  reply: string;
+  citations: AICitation[];
+}
+
+/**
+ * Four canned intents:
+ *   - "amnesty" / "medical"           → Medical Amnesty determination overview
+ *   - "ferpa" / "parental"            → FERPA §99.31 decision flow
+ *   - "hazing" / "campus hazing"      → Stop Campus Hazing Act guidance
+ *   - "sanction" / "due"              → outstanding-sanction snapshot
+ */
+export function conductCopilot(prompt: string, _actorRole: RoleId): AIConductCopilotResult {
+  const q = prompt.toLowerCase().trim();
+
+  if (q.includes('amnesty') || q.includes('medical')) {
+    return {
+      available: true,
+      reply:
+        'Medical Amnesty applies when (a) the violation was alcohol or drug, (b) the subject or a peer ' +
+        'sought emergency medical care, and (c) the subject cooperated with first responders. The ' +
+        'institutional policy POL-MEDICAL-AMNESTY layers educational programming (AlcoholEdu / BASICS) ' +
+        'in lieu of conduct sanction. Open the case detail to see the amnesty-applicability checklist.',
+      citations: [
+        { kind: 'dataset', refId: 'maxient.conduct_cases_normalized', label: 'bit.cases_normalized', linkedRoute: '/catalog/bit.cases_normalized', classification: 'ferpa-edu-record' },
+      ],
+    };
+  }
+
+  if (q.includes('ferpa') || q.includes('parental') || q.includes('99.31')) {
+    return {
+      available: true,
+      reply:
+        'FERPA §99.31(a)(15) permits parental notification when the violation involves alcohol/drug AND the ' +
+        'subject is under 21. The §99.31(a)(10) health/safety emergency basis is broader but narrower in ' +
+        'application — use only when an articulable health/safety threat exists. The platform decision aid ' +
+        'walks both prongs and records the rationale to the parental-notification audit log.',
+      citations: [
+        { kind: 'dataset', refId: 'REG-FERPA-99-31', label: 'FERPA §99.31', linkedRoute: '/regulations', classification: 'public' },
+      ],
+    };
+  }
+
+  if (q.includes('hazing') || q.includes('campus hazing')) {
+    return {
+      available: true,
+      reply:
+        'Per the Stop Campus Hazing Act (2024), institutions must (1) include hazing statistics in the ASR, ' +
+        '(2) maintain a published roster of organizations found responsible for hazing, and (3) deliver hazing ' +
+        'prevention programming. The hazing classifier (`/conduct/organizational`) flags candidate cases for ' +
+        'reportability review.',
+      citations: [
+        { kind: 'dataset', refId: 'REG-STOP-CAMPUS-HAZING', label: 'Stop Campus Hazing Act', linkedRoute: '/regulations', classification: 'public' },
+      ],
+    };
+  }
+
+  if (q.includes('sanction') || q.includes('due')) {
+    return {
+      available: true,
+      reply:
+        'Outstanding sanctions are visible on `/conduct` with an `overdue` highlight. Each sanction carries ' +
+        'an educational-program assignment (where applicable) and a due date; the tracker pages issue ' +
+        'reminders 7 / 3 / 0 days before due.',
+      citations: [],
+    };
+  }
+
+  return {
+    available: true,
+    reply:
+      'I can speak to Medical Amnesty, FERPA §99.31 parental notification, the Stop Campus Hazing Act, ' +
+      'or outstanding sanctions. What would you like to know?',
+    citations: [],
+  };
+}
+
+// =========================================================================
+// amnestyAssist — Medical Amnesty determination aid
+// =========================================================================
+
+export interface AIAmnestyAssessment {
+  available: boolean;
+  /** Whether the criteria appear met. */
+  recommendInvoke: boolean;
+  /** Per-criterion outcome with a short rationale. */
+  criteria: { name: string; met: boolean; rationale: string }[];
+  /** Confidence (0..100). */
+  confidence: number;
+  /** Free-form headline. */
+  headline: string;
+}
+
+export function amnestyAssist(caseId: string): AIAmnestyAssessment {
+  // For R8 we return a canned positive determination for any substance case
+  // whose ID starts with COND- (in production this would inspect the case).
+  return {
+    available: true,
+    recommendInvoke: true,
+    headline:
+      'All three Medical Amnesty criteria appear met. Recommendation: invoke amnesty + assign AlcoholEdu / BASICS ' +
+      'as educational programming.',
+    criteria: [
+      {
+        name: 'Violation type is alcohol or drug',
+        met: true,
+        rationale: 'Conduct case ' + caseId + ' is filed under the substance subtype.',
+      },
+      {
+        name: 'Emergency medical care was sought',
+        met: true,
+        rationale: 'Incident narrative confirms a 911 call placed by the subject or a peer.',
+      },
+      {
+        name: 'Subject cooperated with first responders',
+        met: true,
+        rationale: 'Incident clearance note records cooperation; no force or refusal documented.',
+      },
+    ],
+    confidence: 88,
+  };
+}
+
+// =========================================================================
+// hazingClassifier — Stop Campus Hazing Act reportability classifier
+// =========================================================================
+
+export interface AIHazingClassification {
+  available: boolean;
+  reportable: boolean;
+  confidence: number;
+  rationale: string;
+  /** Sub-elements of the hazing definition with each element's outcome. */
+  elements: { name: string; met: boolean; note: string }[];
+}
+
+export function hazingClassifier(orgCaseId: string): AIHazingClassification {
+  return {
+    available: true,
+    reportable: true,
+    confidence: 91,
+    rationale:
+      'Organizational case ' + orgCaseId + ' meets the Stop Campus Hazing Act definition. Recommended: include ' +
+      'in published roster and the next ASR.',
+    elements: [
+      {
+        name: 'Activity connected to organization initiation / membership',
+        met: true,
+        note: 'Case narrative references "recruitment week" activities.',
+      },
+      {
+        name: 'Coerced / required participation by new members',
+        met: true,
+        note: 'Multiple individual-member statements describe coercion.',
+      },
+      {
+        name: 'Risk of harm to participant — physical or psychological',
+        met: true,
+        note: 'Forced alcohol consumption documented as part of the activity.',
+      },
+    ],
+  };
+}
+
+// =========================================================================
+// ferpaDecisionAid — FERPA §99.31 parental notification decision aid
+// =========================================================================
+
+export interface AIFerpaDecisionAid {
+  available: boolean;
+  recommendation: 'notify' | 'decline' | 'pending-decision';
+  /** Per-prong outcome (a)(15) + (a)(10). */
+  prongs: {
+    citation: '99.31(a)(15)-alcohol-drug-under-21' | '99.31(a)(10)-health-safety-emergency';
+    applicable: boolean;
+    rationale: string;
+  }[];
+  headline: string;
+}
+
+export function ferpaDecisionAid(caseId: string): AIFerpaDecisionAid {
+  return {
+    available: true,
+    recommendation: 'notify',
+    headline:
+      'Subject is under 21 and case is a substance-policy violation. §99.31(a)(15) basis applies — notification ' +
+      'is permissible and aligned with policy POL-FERPA-99-31.',
+    prongs: [
+      {
+        citation: '99.31(a)(15)-alcohol-drug-under-21',
+        applicable: true,
+        rationale: 'Case ' + caseId + ': substance subtype + subject age verified under 21.',
+      },
+      {
+        citation: '99.31(a)(10)-health-safety-emergency',
+        applicable: false,
+        rationale: 'No articulable imminent health/safety emergency present; rely on the (a)(15) basis instead.',
+      },
+    ],
+  };
+}

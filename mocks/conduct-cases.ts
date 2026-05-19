@@ -130,6 +130,32 @@ for (let i = 0; i < 16; i++) {
   residentialCases.push(genCase(200 + i, 'residential', RESIDENTIAL_BUILDINGS));
 }
 
+// R8 expansion: remaining 6 subtypes
+const academicIntegrityCases: ConductCase[] = [];
+for (let i = 0; i < 14; i++) {
+  academicIntegrityCases.push(genCase(300 + i, 'academic-integrity', SUBSTANCE_BUILDINGS));
+}
+const sexualMisconductCases: ConductCase[] = [];
+for (let i = 0; i < 8; i++) {
+  sexualMisconductCases.push(genCase(400 + i, 'sexual-misconduct', RESIDENTIAL_BUILDINGS));
+}
+const physicalAltercationCases: ConductCase[] = [];
+for (let i = 0; i < 10; i++) {
+  physicalAltercationCases.push(genCase(500 + i, 'physical-altercation', RESIDENTIAL_BUILDINGS));
+}
+const biasIncidentCases: ConductCase[] = [];
+for (let i = 0; i < 6; i++) {
+  biasIncidentCases.push(genCase(600 + i, 'bias-incident', RESIDENTIAL_BUILDINGS));
+}
+const organizationalCases: ConductCase[] = [];
+for (let i = 0; i < 7; i++) {
+  organizationalCases.push(genCase(700 + i, 'organizational', RESIDENTIAL_BUILDINGS));
+}
+const otherCases: ConductCase[] = [];
+for (let i = 0; i < 9; i++) {
+  otherCases.push(genCase(800 + i, 'other', RESIDENTIAL_BUILDINGS));
+}
+
 // Pin inDays so we can reach it from helpers later (avoids unused-import lint).
 void inDays;
 
@@ -138,6 +164,12 @@ export const CONDUCT_CASES: ConductCase[] = [
   threadAGuestPolicy,
   ...substanceCases,
   ...residentialCases,
+  ...academicIntegrityCases,
+  ...sexualMisconductCases,
+  ...physicalAltercationCases,
+  ...biasIncidentCases,
+  ...organizationalCases,
+  ...otherCases,
 ].sort((a, b) => new Date(b.openedAt).getTime() - new Date(a.openedAt).getTime());
 
 export const THREAD_A_CONDUCT_CASES = [threadAAlcohol, threadAGuestPolicy];

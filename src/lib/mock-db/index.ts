@@ -71,6 +71,15 @@ export { CSA_REPORTS, THREAD_C_CSA_DISCLOSURE } from '../../../mocks/csa-reports
 export { TIMELY_WARNINGS, THREAD_C_TIMELY_WARNING } from '../../../mocks/timely-warnings';
 export { NIBRIS_SUBMISSIONS } from '../../../mocks/nibris-submissions';
 export { FOIA_REQUESTS, THREAD_C_FOIA_REQUEST } from '../../../mocks/foia-requests';
+export { CONDUCT_CHARGES, THREAD_A_CONDUCT_CHARGES } from '../../../mocks/charges';
+export { MISSING_STUDENT_REPORTS } from '../../../mocks/missing-students';
+export { BIAS_INCIDENTS } from '../../../mocks/bias-incidents';
+export { ORGANIZATIONAL_CONDUCT_CASES } from '../../../mocks/organizational-conduct';
+export { CIT_DISPATCH_FLAGS } from '../../../mocks/cit-dispatch-flags';
+export { ACADEMIC_INTEGRITY_CASES } from '../../../mocks/academic-integrity';
+export { POLICIES } from '../../../mocks/policies';
+export { REGULATIONS } from '../../../mocks/regulations';
+export { PLATFORM_ACCESS_LOG } from '../../../mocks/access-log';
 
 // ----- imports for computed helpers ---------------------------------------
 import { BUILDINGS } from '../../../mocks/buildings';
@@ -123,6 +132,15 @@ import { CSA_REPORTS } from '../../../mocks/csa-reports';
 import { TIMELY_WARNINGS } from '../../../mocks/timely-warnings';
 import { NIBRIS_SUBMISSIONS } from '../../../mocks/nibris-submissions';
 import { FOIA_REQUESTS } from '../../../mocks/foia-requests';
+import { CONDUCT_CHARGES } from '../../../mocks/charges';
+import { MISSING_STUDENT_REPORTS } from '../../../mocks/missing-students';
+import { BIAS_INCIDENTS } from '../../../mocks/bias-incidents';
+import { ORGANIZATIONAL_CONDUCT_CASES } from '../../../mocks/organizational-conduct';
+import { CIT_DISPATCH_FLAGS } from '../../../mocks/cit-dispatch-flags';
+import { ACADEMIC_INTEGRITY_CASES } from '../../../mocks/academic-integrity';
+import { POLICIES } from '../../../mocks/policies';
+import { REGULATIONS } from '../../../mocks/regulations';
+import { PLATFORM_ACCESS_LOG } from '../../../mocks/access-log';
 import type {
   Building, ResidenceHall, Beat, Region, RegionId,
   Domain, DomainId,
@@ -150,6 +168,9 @@ import type {
   ShuttleRoute, TransitGPSPing,
   CleryPolygonSet, ASRWorkspaceRow, CleryCrimeCategory, CleryGeographyClass,
   CSAReport, TimelyWarning, NIBRSSubmission, FOIARequest, FOIAStatus,
+  ConductCharge, MissingStudentReport, BiasIncident,
+  OrganizationalConductCase, CITDispatchFlag, AcademicIntegrityCase,
+  Policy, PolicyCategory, Regulation, RegulationId, PlatformAccessLogEntry,
 } from '@/lib/types';
 import type { DqRuleRow } from '../../../mocks/dq-rules';
 
@@ -1023,6 +1044,89 @@ export function foiaRequestsOverdue(): FOIARequest[] {
       r.status !== 'closed' &&
       new Date(r.dueAt).getTime() < now,
   );
+}
+
+// ====== Module 5B Conduct depth + Governance (R8) =========================
+
+export function chargesForCase(caseId: string): ConductCharge[] {
+  return CONDUCT_CHARGES.filter((c) => c.conductCaseId === caseId);
+}
+
+export function getMissingStudentReport(id: string): MissingStudentReport | undefined {
+  return MISSING_STUDENT_REPORTS.find((r) => r.id === id);
+}
+
+export function missingStudentReportsActive(): MissingStudentReport[] {
+  return MISSING_STUDENT_REPORTS.filter(
+    (r) => r.status === 'protocol-active' || r.status === 'verification-in-progress',
+  );
+}
+
+export function getBiasIncident(id: string): BiasIncident | undefined {
+  return BIAS_INCIDENTS.find((b) => b.id === id);
+}
+
+export function biasIncidentsHateCrimeThresholdMet(): BiasIncident[] {
+  return BIAS_INCIDENTS.filter((b) => b.hateCrimeThresholdMet);
+}
+
+export function getOrganizationalCase(id: string): OrganizationalConductCase | undefined {
+  return ORGANIZATIONAL_CONDUCT_CASES.find((o) => o.id === id);
+}
+
+export function organizationalHazingReportable(): OrganizationalConductCase[] {
+  return ORGANIZATIONAL_CONDUCT_CASES.filter((o) => o.hazingActReportable);
+}
+
+export function organizationalPublishedToRoster(): OrganizationalConductCase[] {
+  return ORGANIZATIONAL_CONDUCT_CASES.filter((o) => o.publishedToRoster);
+}
+
+export function citFlagsForIncident(incidentId: string): CITDispatchFlag[] {
+  return CIT_DISPATCH_FLAGS.filter((f) => f.incidentId === incidentId);
+}
+
+export function citFlagsCfr42Hits(): CITDispatchFlag[] {
+  return CIT_DISPATCH_FLAGS.filter((f) => f.cfr42HitOccurred);
+}
+
+export function getAcademicIntegrityCase(id: string): AcademicIntegrityCase | undefined {
+  return ACADEMIC_INTEGRITY_CASES.find((a) => a.id === id);
+}
+
+export function academicIntegrityEscalated(): AcademicIntegrityCase[] {
+  return ACADEMIC_INTEGRITY_CASES.filter((a) => a.escalatedToConduct);
+}
+
+export function getPolicy(id: string): Policy | undefined {
+  return POLICIES.find((p) => p.id === id);
+}
+
+export function policiesByCategory(c: PolicyCategory): Policy[] {
+  return POLICIES.filter((p) => p.category === c);
+}
+
+export function policiesDueForReview(daysAhead = 60): Policy[] {
+  const cutoff = Date.now() + daysAhead * 24 * 60 * 60 * 1000;
+  return POLICIES.filter((p) => new Date(p.nextReviewDueAt).getTime() <= cutoff);
+}
+
+export function getRegulation(id: RegulationId): Regulation | undefined {
+  return REGULATIONS.find((r) => r.id === id);
+}
+
+export function regulationsByJurisdiction(j: 'federal' | 'state' | 'institutional'): Regulation[] {
+  return REGULATIONS.filter((r) => r.jurisdiction === j);
+}
+
+export function accessLogRecent(limit = 50): PlatformAccessLogEntry[] {
+  return PLATFORM_ACCESS_LOG.slice(0, limit);
+}
+
+export function accessLogByActionKind(): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const e of PLATFORM_ACCESS_LOG) out[e.action] = (out[e.action] ?? 0) + 1;
+  return out;
 }
 
 // ====== Cross-narrative integrity check ===================================

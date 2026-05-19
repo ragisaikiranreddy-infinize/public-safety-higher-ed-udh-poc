@@ -24,7 +24,13 @@ export interface RoleConfig {
 
 const SIDEBAR_GROUPS = [
   'Overview',
-  'Data',
+  // R8: Data split into two surfaces.
+  //   "Lineage & Audit" — Catalog + Metrics + Lineage view; read-only-feeling
+  //     surface for compliance personas (Clery Officer, BIT Chair, Audit lead).
+  //   "Data Platform" — Sources + Pipelines + Quality; admin surface for
+  //     platform-operator personas (CISO / IT Director).
+  'Lineage & Audit',
+  'Data Platform',
   'Incidents',
   'People',
   'Threat Intel',
@@ -69,11 +75,9 @@ const ROLE_CONFIGS: Record<RoleId, RoleConfig> = {
     homeKpiOrder: [
       'active-activations', 'buildings-in-lockdown', 'campaigns-sent', 'generator-alerts',
     ],
-    // Data added so the EOC duty officer can verify NWS/Rave feed health
-    // pre-activation (Sources view in particular). R8 splits the Data group
-    // so this narrows to Sources-only; for R1 we accept the full group.
+    // R8 split: EOC duty officer needs source health pre-activation → Data Platform.
     visibleSidebar: [
-      'Overview', 'Data', 'EOC', 'Surveillance', 'Campus Ops', 'Compliance', 'Intelligence',
+      'Overview', 'Data Platform', 'EOC', 'Surveillance', 'Campus Ops', 'Compliance', 'Intelligence',
     ],
     classifications: ['public', 'internal', 'cji'],
   },
@@ -107,10 +111,10 @@ const ROLE_CONFIGS: Record<RoleId, RoleConfig> = {
     homeKpiOrder: [
       'open-bit-cases', 'risk-tier-changed', 'weekly-meeting-agenda', 'barrier-hits',
     ],
-    // Data added so the CARE chair can diagnose a stale BIT briefing
-    // (Pipelines + Quality views surface upstream blocks like a Maxient
-    // export lag). R8 narrows to Pipelines + Quality only via the split.
-    visibleSidebar: ['Overview', 'Data', 'People', 'Threat Intel', 'Conduct', 'Intelligence'],
+    // R8 split: CARE chair gets the read-only lineage/audit surface — Lineage & Audit.
+    // (For diagnosing a stale BIT briefing they cross-check the catalog freshness
+    // pill; full pipeline ops belongs to CISO.)
+    visibleSidebar: ['Overview', 'Lineage & Audit', 'People', 'Threat Intel', 'Conduct', 'Intelligence'],
     classifications: ['public', 'internal', 'ferpa-edu-record', 'pii'],
   },
   'clery-officer': {
@@ -120,10 +124,9 @@ const ROLE_CONFIGS: Record<RoleId, RoleConfig> = {
     homeKpiOrder: [
       'asr-completeness', 'timely-warnings', 'csa-outstanding', 'hate-crime-review',
     ],
-    // Data added so ASR lineage trace (Catalog) + ASR mart freshness
-    // (Pipelines + Quality) are reachable from the sidebar — both are
-    // core to Clery audit workflows. R8 narrows to Lineage & Audit only.
-    visibleSidebar: ['Overview', 'Data', 'Incidents', 'Compliance', 'Intelligence'],
+    // R8 split: Clery officer is a compliance role — Lineage & Audit only.
+    // ASR lineage trace lives in Catalog; mart freshness is still visible there.
+    visibleSidebar: ['Overview', 'Lineage & Audit', 'Incidents', 'Compliance', 'Intelligence'],
     classifications: ['public', 'internal', 'cji'],
   },
   ciso: {
@@ -133,7 +136,9 @@ const ROLE_CONFIGS: Record<RoleId, RoleConfig> = {
     homeKpiOrder: [
       'sources-unhealthy', 'barrier-hits-today', 'cji-access-events', 'dr-posture',
     ],
-    visibleSidebar: ['Overview', 'Data', 'Trust'],
+    // R8 split: CISO keeps both surfaces — sees Lineage & Audit (read) and
+    // Data Platform (admin).
+    visibleSidebar: ['Overview', 'Lineage & Audit', 'Data Platform', 'Trust'],
     classifications: [
       'public', 'internal', 'ferpa-edu-record', 'cji', 'title-ix-sensitive',
       'pii', 'phi', 'juvenile', 'restricted-investigation',

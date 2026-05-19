@@ -850,6 +850,124 @@ export interface ParentalNotification {
   classification: Classification;        // ferpa-edu-record
 }
 
+// ----- §9 R8 additions: Module 5B full conduct surface -------------------
+
+/** Per-case violation charges — one conduct case can carry many charges. */
+export interface ConductCharge {
+  id: string;                            // 'CHG-2026-...'
+  conductCaseId: string;
+  code: string;                          // institutional violation code, e.g. 'R-3.2.1'
+  label: string;                         // human description
+  /** Was this charge sustained at hearing? */
+  sustained: boolean | null;             // null = pre-hearing
+  sustainingPersonId?: string;
+  /** FERPA / Title IX cross-references for the charge. */
+  regulatoryHooks: RegulationId[];
+  classification: Classification;
+}
+
+/** Missing-student protocol (per Clery / HEOA §485(j)). */
+export type MissingStudentStatus =
+  | 'reported'
+  | 'verification-in-progress'
+  | 'protocol-active'
+  | 'recovered'
+  | 'closed-other';
+
+export interface MissingStudentReport {
+  id: string;                            // 'MSR-2026-...'
+  subjectPersonId: string;
+  reportedAt: string;
+  status: MissingStudentStatus;
+  reporterRole: 'roommate' | 'faculty' | 'family' | 'staff' | 'self' | 'other';
+  /** Hours from reportedAt to the 24-hour HEOA-required parental notification trigger. */
+  hoursOverdue: number;
+  /** When the 24-hour notification was issued (if applicable). */
+  parentalNotifiedAt?: string;
+  lastSeenBuildingId?: string;
+  /** Free-text narrative — sanitized. */
+  narrative: string;
+  classification: Classification;
+}
+
+/** Bias / hate-related incident records (BART workflow). */
+export type BiasIncidentStatus = 'reported' | 'reviewed' | 'referred-pd' | 'no-action' | 'closed';
+
+export interface BiasIncident {
+  id: string;                            // 'BIA-2026-...'
+  reportedAt: string;
+  subjectPersonId?: string;
+  /** What protected category the incident is alleged to target. */
+  biasCategory: HateCrimeBias;
+  /** Did the criminal hate-crime threshold appear met? */
+  hateCrimeThresholdMet: boolean;
+  status: BiasIncidentStatus;
+  buildingId?: string;
+  /** One-line summary. */
+  summary: string;
+  /** Cross-reference to a PD incident (if elevated). */
+  linkedIncidentId?: string;
+  classification: Classification;
+}
+
+/** Organizational (Greek chapter / athletic team) conduct cases. */
+export type OrganizationKind = 'fraternity' | 'sorority' | 'athletic-team' | 'cultural-org' | 'club';
+export type OrgConductStatus = 'reported' | 'investigation' | 'sanction-pending' | 'sanction-active' | 'derecognized' | 'closed';
+
+export interface OrganizationalConductCase {
+  id: string;                            // 'ORG-2026-...'
+  organizationName: string;
+  organizationKind: OrganizationKind;
+  chapterSize: number;
+  status: OrgConductStatus;
+  openedAt: string;
+  closedAt?: string;
+  /** Whether the Stop Campus Hazing reporting threshold appears met. */
+  hazingActReportable: boolean;
+  /** Whether the case was referred to the published roster of violators (state laws). */
+  publishedToRoster: boolean;
+  summary: string;
+  /** Number of individual members charged. */
+  individualMemberChargedCount: number;
+  classification: Classification;
+}
+
+/** CIT (Crisis Intervention Team) dispatch-flag annotation. */
+export type CITFlagKind = 'wellness-check' | 'mental-health-crisis' | 'suicidal-ideation' | 'overdose' | 'self-harm';
+
+export interface CITDispatchFlag {
+  id: string;                            // 'CIT-FLG-2026-...'
+  incidentId: string;
+  flaggedAt: string;
+  kind: CITFlagKind;
+  /** Optional CIT-trained officer dispatched. */
+  citOfficerId?: string;
+  /** Whether outcome was a transport-to-treatment vs. arrest. */
+  outcome: 'transport-to-treatment' | 'voluntary-services' | 'no-action' | 'arrest' | 'pending';
+  /** Whether a 42 CFR Part 2 wall barrier hit fired during the dispatch. */
+  cfr42HitOccurred: boolean;
+  classification: Classification;
+}
+
+/** Academic-integrity cases (faculty-side; tracked separately). */
+export type AcademicIntegrityKind = 'plagiarism' | 'unauthorized-collaboration' | 'fabrication' | 'cheating' | 'gen-ai-misuse' | 'tampering';
+export type AcademicIntegrityStatus = 'reported' | 'faculty-resolution' | 'standards-review' | 'sanction-active' | 'closed';
+
+export interface AcademicIntegrityCase {
+  id: string;                            // 'AIC-2026-...'
+  subjectPersonId: string;
+  facultyPersonId: string;
+  courseCode: string;
+  kind: AcademicIntegrityKind;
+  status: AcademicIntegrityStatus;
+  reportedAt: string;
+  /** Faculty-level resolution outcome (warning, course penalty). */
+  facultyResolution?: string;
+  /** Did the case escalate to the Office of Student Conduct? */
+  escalatedToConduct: boolean;
+  classification: Classification;
+}
+
 // =========================================================================
 // §10 — Access Control & Buildings
 // =========================================================================
@@ -1960,6 +2078,84 @@ export interface BarrierHitLogEntry {
   resourceId: string;
   barrierId: string;
   outcome: 'masked' | 'denied' | 'allowed-with-override';
+}
+
+// ----- §21 R8 additions: Policies + Regulations + Access log --------------
+
+/** Institutional policy referenced by audit + governance UIs. */
+export type PolicyCategory =
+  | 'student-conduct'
+  | 'title-ix'
+  | 'clery'
+  | 'ferpa'
+  | 'data-classification'
+  | 'information-security'
+  | 'access-control'
+  | 'mass-notification'
+  | 'records-retention'
+  | 'incident-response'
+  | 'hazing-prevention'
+  | 'medical-amnesty';
+
+export interface Policy {
+  id: string;                       // 'POL-CONDUCT-CODE'
+  name: string;
+  category: PolicyCategory;
+  description: string;
+  ownerRole: RoleId | 'office-of-general-counsel';
+  /** Last review date — ISO. */
+  lastReviewedAt: string;
+  /** Next required review (typically 12 months out). */
+  nextReviewDueAt: string;
+  /** Regulations the policy satisfies. */
+  regulatoryHooks: RegulationId[];
+  /** External URL placeholder (institutional intranet). */
+  externalUrl?: string;
+  classification: Classification;
+}
+
+/** Regulatory citation entry — used by the regulations registry view. */
+export interface Regulation {
+  id: RegulationId;
+  shortName: string;                // e.g. 'Clery Act'
+  longName: string;
+  /** Citation, e.g. '20 USC §1092(f); 34 CFR §668.46'. */
+  citation: string;
+  jurisdiction: 'federal' | 'state' | 'institutional';
+  /** Coarse description of what the regulation requires. */
+  scope: string;
+  /** Linked policy IDs that operationalize this regulation. */
+  policyIds: string[];
+  /** ISO date of last regulatory update we track. */
+  lastAmendedAt: string;
+  /** Whether the platform considers this regulation actively enforced. */
+  active: boolean;
+}
+
+/** Platform access-log entry — every action against a sensitive resource. */
+export type AccessLogActionKind =
+  | 'view'
+  | 'export'
+  | 'edit'
+  | 'override'
+  | 'masked'
+  | 'denied'
+  | 'login'
+  | 'role-switch';
+
+export interface PlatformAccessLogEntry {
+  id: string;                       // 'ALG-2026-...'
+  at: string;
+  actorRole: RoleId;
+  actorPersonId?: string;
+  action: AccessLogActionKind;
+  resourceKind: string;             // 'person' | 'incident' | 'bit-case' | etc.
+  resourceId: string;
+  classification: Classification;
+  /** When a barrier fired, the hit ID it produced. */
+  barrierHitId?: string;
+  /** Optional reason / override path. */
+  reason?: string;
 }
 
 // §17 small helper: governed semantic-layer metric entries.

@@ -4,8 +4,7 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '@/components/layout/app-shell';
 import { RoleProvider } from '@/lib/role-context';
 
-// R0–R7 routes wired. Remaining phases land incrementally:
-//   R8 — Module 5B Conduct + Governance
+// R0–R8 routes wired. Remaining phases land incrementally:
 //   R9 — Polish, copilots, AI surfaces, demo script
 //
 // Until each phase lands, those URLs render the NotFoundPage (404-friendly).
@@ -49,6 +48,15 @@ import CleryGeographyPage from '@/routes/clery-geography';
 import NIBRISPage from '@/routes/nibris';
 import FOIAPage from '@/routes/foia';
 import FOIADetailPage from '@/routes/foia-detail';
+import ConductPage from '@/routes/conduct';
+import ConductAmnestyPage from '@/routes/conduct-amnesty';
+import MissingStudentsPage from '@/routes/missing-students';
+import BiasPage from '@/routes/bias';
+import OrganizationalPage from '@/routes/organizational';
+import GovernancePage from '@/routes/governance';
+import AuditPage from '@/routes/audit';
+import PoliciesPage from '@/routes/policies';
+import RegulationsPage from '@/routes/regulations';
 import NotFoundPage from '@/routes/not-found';
 
 import './styles/globals.css';
@@ -111,6 +119,19 @@ const router = createBrowserRouter([
       { path: 'nibris', element: <NIBRISPage /> },
       { path: 'foia', element: <FOIAPage /> },
       { path: 'foia/requests/:id', element: <FOIADetailPage /> },
+
+      // Module 5B Conduct depth (R8)
+      { path: 'conduct', element: <ConductPage /> },
+      { path: 'conduct/amnesty', element: <ConductAmnestyPage /> },
+      { path: 'missing-students', element: <MissingStudentsPage /> },
+      { path: 'bias', element: <BiasPage /> },
+      { path: 'organizational', element: <OrganizationalPage /> },
+
+      // Governance (R8)
+      { path: 'governance', element: <GovernancePage /> },
+      { path: 'audit', element: <AuditPage /> },
+      { path: 'policies', element: <PoliciesPage /> },
+      { path: 'regulations', element: <RegulationsPage /> },
 
       { path: '*', element: <NotFoundPage /> },
     ],

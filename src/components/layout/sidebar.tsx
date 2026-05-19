@@ -44,14 +44,21 @@ interface NavSection {
 
 const SECTIONS: NavSection[] = [
   { label: 'Overview', items: [{ to: '/', label: 'Command Center', icon: Gauge, end: true }] },
+  // R8 split — compliance-facing read surface
   {
-    label: 'Data',
+    label: 'Lineage & Audit',
     items: [
       { to: '/catalog', label: 'Catalog', icon: Database },
+      { to: '/metrics', label: 'Metrics', icon: Target },
+    ],
+  },
+  // R8 split — platform-operator admin surface
+  {
+    label: 'Data Platform',
+    items: [
       { to: '/sources', label: 'Sources', icon: Plug },
       { to: '/pipelines', label: 'Pipelines', icon: ArrowRightLeft },
       { to: '/quality', label: 'Quality', icon: ShieldCheck },
-      { to: '/metrics', label: 'Metrics', icon: Target },
     ],
   },
   {
@@ -78,8 +85,11 @@ const SECTIONS: NavSection[] = [
   {
     label: 'Conduct',
     items: [
-      // R5 ships the conduct detail page; the list + subtype views land in R8.
-      { to: '/conduct/COND-2024-00211', label: 'Conduct (Thread A demo)', icon: GraduationCap },
+      { to: '/conduct', label: 'Conduct cases', icon: GraduationCap },
+      { to: '/conduct/amnesty', label: 'Amnesty + FERPA', icon: GraduationCap, badge: 'AI' },
+      { to: '/missing-students', label: 'Missing students', icon: GraduationCap },
+      { to: '/bias', label: 'Bias incidents', icon: GraduationCap },
+      { to: '/organizational', label: 'Organizational', icon: GraduationCap },
     ],
   },
   {
@@ -143,6 +153,8 @@ const SECTIONS: NavSection[] = [
     items: [
       { to: '/governance', label: 'Governance', icon: ShieldAlert },
       { to: '/audit', label: 'Audit-of-Audit', icon: ShieldAlert },
+      { to: '/policies', label: 'Policies', icon: ShieldCheck },
+      { to: '/regulations', label: 'Regulations', icon: ShieldCheck },
     ],
   },
 ];

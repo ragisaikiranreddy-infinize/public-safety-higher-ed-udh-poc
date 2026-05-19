@@ -78,10 +78,8 @@ const SECTIONS: NavSection[] = [
   {
     label: 'Conduct',
     items: [
-      { to: '/conduct', label: 'Conduct Cases', icon: GraduationCap },
-      { to: '/conduct/substance', label: 'Substance', icon: GraduationCap },
-      { to: '/conduct/residential', label: 'Residential', icon: GraduationCap },
-      { to: '/conduct/sanctions', label: 'Sanctions', icon: GraduationCap },
+      // R5 ships the conduct detail page; the list + subtype views land in R8.
+      { to: '/conduct/COND-2024-00211', label: 'Conduct (Thread A demo)', icon: GraduationCap },
     ],
   },
   {

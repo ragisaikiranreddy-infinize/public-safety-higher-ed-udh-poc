@@ -559,8 +559,296 @@ export interface Domain {
 }
 
 // =========================================================================
-// §9 — Title IX, Conduct & Misconduct (R8) — stubbed
+// §9 — Behavioral Threat (BIT) + Title IX + Conduct (R5 partial; R8 full)
 // =========================================================================
+
+/**
+ * NaBITA-aligned risk tier. Per spec §4 Module 5A, the BIT process uses a
+ * structured-professional-judgment rubric — the AI surfaces a tier with
+ * "trending" direction, never a decision; the human review records the final.
+ */
+export type BITRiskTier = 'mild' | 'moderate' | 'elevated' | 'critical';
+export type BITRiskTrend = 'rising' | 'stable' | 'falling';
+
+export type BITCaseStatus =
+  | 'intake'
+  | 'screening'
+  | 'monitoring'
+  | 'active-review'
+  | 'imminent-threat'
+  | 'closed';
+
+/** A BIT case — the multi-source threat-assessment record. */
+export interface BITCase {
+  id: string;                            // 'BIT-2026-0067'
+  subjectPersonId: string;
+  status: BITCaseStatus;
+  riskTier: BITRiskTier;
+  riskTrend: BITRiskTrend;
+  /** NaBITA dimensions on a 0–10 scale (subject / target / environment / precipitating). */
+  nabita: {
+    subject: number;
+    target: number;
+    environment: number;
+    precipitating: number;
+  };
+  openedAt: string;
+  lastReviewedAt: string;
+  nextReviewDueAt: string;
+  caseLead: string;                      // PersonId of BIT chair / case manager
+  teamMemberIds: string[];               // BIT team — multidisciplinary
+  /** Cross-references (none required to exist). */
+  linkedIncidentIds: string[];
+  linkedConductCaseIds: string[];
+  linkedTitleIxCaseId?: string;
+  linkedNoContactOrderIds: string[];
+  /** Source signal summary — used to render the contributors feed. */
+  contributorCounts: {
+    tips: number;
+    accessAnomalies: number;
+    cameraAnalytics: number;
+    incidents: number;
+    conduct: number;
+    other: number;
+  };
+  /** A short ‘imminent-threat finding’ flag set by the case lead. */
+  imminentThreatFinding: boolean;
+  /** Two-sentence narrative summary visible in case lists. */
+  narrative: string;
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
+
+/** Evidence record — every signal attached to a BIT case. */
+export type BITEvidenceKind =
+  | 'tip'
+  | 'incident'
+  | 'access-anomaly'
+  | 'camera-analytic'
+  | 'conduct-case'
+  | 'lms-engagement'
+  | 'roommate-report'
+  | 'social-media'
+  | 'observation';
+
+export interface BITEvidence {
+  id: string;
+  caseId: string;
+  kind: BITEvidenceKind;
+  /** Optional FK back to the originating record. */
+  sourceRefId?: string;
+  /** Optional dataset that this evidence drew from (for the citation chip). */
+  evidenceDatasetId?: string;
+  /** ISO timestamp of the underlying signal (not the record). */
+  observedAt: string;
+  /** Two-line narrative — first line is the headline, second the evidence. */
+  summary: string;
+  weight: number;                        // 0..100 — heuristic contribution to risk
+  classification: Classification;
+}
+
+/** A BIT support plan — actions the team committed to. */
+export type BITPlanActionKind =
+  | 'welfare-check'
+  | 'no-contact-issuance'
+  | 'parental-notification'
+  | 'counseling-referral'
+  | 'housing-relocation'
+  | 'academic-accommodation'
+  | 'safety-plan-coordination'
+  | 'law-enforcement-notification'
+  | 'follow-up-meeting';
+
+export interface BITPlanAction {
+  id: string;
+  caseId: string;
+  kind: BITPlanActionKind;
+  ownerRole: RoleId;
+  ownerPersonId?: string;
+  dueAt: string;
+  status: 'pending' | 'in-progress' | 'completed' | 'overdue';
+  notes: string;
+  classification: Classification;
+}
+
+// ----- Anonymous tips + LiveSafe -------------------------------------------
+
+export type TipChannel = 'phone' | 'web' | 'livesafe-app' | 'walk-in' | 'email' | 'sms';
+
+export type TipDisposition =
+  | 'open'
+  | 'under-review'
+  | 'routed-to-bit'
+  | 'routed-to-tix'
+  | 'routed-to-pd'
+  | 'routed-to-dean'
+  | 'closed-no-action';
+
+export interface AnonymousTip {
+  id: string;                            // 'TIP-2026-0142'
+  channel: TipChannel;
+  receivedAt: string;
+  /** What/who the tip is about (free text, AI-extracted entities tracked separately). */
+  subjectFreeText: string;
+  /** Resolved subject person ID if identity-resolution found a match. */
+  matchedPersonId?: string;
+  /** AI-extracted topic tags. */
+  topics: ('substance' | 'self-harm' | 'threat' | 'harassment' | 'theft' | 'weapons' | 'other')[];
+  /** Reporter-supplied anonymity preference. */
+  anonymous: boolean;
+  /** Reporter device hint (used by identity-resolution). */
+  deviceId?: string;
+  buildingId?: string;
+  body: string;                          // tip narrative (PII handled below)
+  disposition: TipDisposition;
+  routedTo?: 'bit' | 'tix' | 'pd' | 'dean';
+  routedAt?: string;
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
+
+/** LiveSafe-style two-way conversation — a tip can spawn one. */
+export interface LiveSafeChat {
+  id: string;
+  tipId?: string;
+  startedAt: string;
+  participantRole: 'reporter' | 'dispatcher' | 'bit-intake';
+  /** Each line is a short turn — the modal shows them as a stream. */
+  turns: { role: 'reporter' | 'operator'; at: string; text: string }[];
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
+
+// ----- Title IX (walled) ---------------------------------------------------
+
+export type TitleIXPhase =
+  | 'informal-intake'
+  | 'supportive-measures'
+  | 'formal-complaint'
+  | 'investigation'
+  | 'hearing'
+  | 'determination'
+  | 'closed';
+
+export interface TitleIXCase {
+  id: string;                            // 'TIX-2026-0014'
+  complainantPersonId: string;
+  respondentPersonId: string;
+  phase: TitleIXPhase;
+  /** Statutory clock — typically 60 business days from formal complaint to determination. */
+  openedAt: string;
+  formalComplaintAt?: string;
+  determinationDueAt?: string;
+  /** Supportive measures currently in place. */
+  supportiveMeasures: ('no-contact-directive' | 'class-schedule-adjust' | 'housing-relocation' | 'academic-accommodation' | 'counseling-referral' | 'safety-escort')[];
+  /** One-line headline visible only to Title IX role. */
+  headline: string;
+  /** Two-paragraph narrative — Title IX role only. */
+  narrative: string;
+  classification: Classification;         // always 'title-ix-sensitive'
+  threadTag?: ThreadTag;
+}
+
+// ----- Conduct (substance + residential subtypes for R5; full set in R8) ---
+
+export type ConductSubtype =
+  | 'substance'
+  | 'residential'
+  | 'academic-integrity'
+  | 'sexual-misconduct'
+  | 'physical-altercation'
+  | 'bias-incident'
+  | 'organizational'
+  | 'other';
+
+export type ConductStatus =
+  | 'reported'
+  | 'investigation'
+  | 'pre-hearing'
+  | 'hearing'
+  | 'sanction-pending'
+  | 'sanction-active'
+  | 'closed'
+  | 'closed-amnesty';
+
+export interface ConductCase {
+  id: string;                            // 'COND-2025-01882'
+  subjectPersonId: string;
+  subtype: ConductSubtype;
+  status: ConductStatus;
+  openedAt: string;
+  closedAt?: string;
+  reportedFromIncidentId?: string;
+  buildingId?: string;
+  /** Was Medical Amnesty invoked under spec §2 Module 5A? */
+  medicalAmnestyInvoked?: boolean;
+  /** Was parental notification considered (FERPA §99.31(a)(15))? */
+  parentalNotificationConsidered?: boolean;
+  /** Two-line summary — first line is the violation, second the disposition. */
+  summary: string;
+  /** Aggregator: total sanction count. */
+  sanctionCount: number;
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
+
+export type SanctionKind =
+  | 'warning'
+  | 'probation'
+  | 'edu-program'
+  | 'community-service'
+  | 'restitution'
+  | 'housing-suspension'
+  | 'suspension'
+  | 'expulsion';
+
+export type SanctionStatus = 'pending' | 'active' | 'completed' | 'overdue' | 'lifted';
+
+export interface Sanction {
+  id: string;                            // 'SNC-2026-00417-A'
+  conductCaseId: string;
+  kind: SanctionKind;
+  status: SanctionStatus;
+  issuedAt: string;
+  dueAt?: string;
+  completedAt?: string;
+  /** Optional reference to an Educational Program ID. */
+  eduProgramId?: string;
+  description: string;
+  classification: Classification;
+}
+
+/** Educational program — e.g. AlcoholEdu, Project Northland module, etc. */
+export interface EduProgram {
+  id: string;                            // 'EDU-PROG-ALCEDU'
+  name: string;
+  provider: string;
+  durationHours: number;
+  targetSubtype: ConductSubtype;
+  description: string;
+}
+
+/** FERPA §99.31(a)(15) parental-notification audit entry. */
+export type ParentalNotifTrigger =
+  | 'alcohol-violation'
+  | 'drug-violation'
+  | 'safety-concern'
+  | 'self-harm-concern';
+
+export interface ParentalNotification {
+  id: string;                            // 'PNT-2026-00031'
+  subjectPersonId: string;
+  conductCaseId?: string;
+  bitCaseId?: string;
+  trigger: ParentalNotifTrigger;
+  /** FERPA §99.31(a)(15) test — only available when subject is under 21 for alcohol/drug. */
+  ferpaBasis: '99.31(a)(15)-alcohol-drug-under-21' | '99.31(a)(10)-health-safety-emergency';
+  decidedAt: string;
+  decidedByPersonId: string;
+  decision: 'notified' | 'declined' | 'pending-decision';
+  rationale: string;
+  classification: Classification;        // ferpa-edu-record
+}
 
 // =========================================================================
 // §10 — Access Control & Buildings

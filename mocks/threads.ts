@@ -148,6 +148,11 @@ export const THREAD_ANCHOR_REGISTRY = {
     PIPELINE_FAILED_GATE_PATH_ID,
     PIPELINE_BLOCKED_PATH_ID,
   ],
-  // R3+ will add incidents, bit-cases, title-ix-cases, conduct-cases,
-  // notification-campaigns, eoc-activations, asr-lines, etc.
+  bitCases: [THREAD_A_BIT_CASE_ID],
+  titleIxCases: [THREAD_A_TITLE_IX_INTAKE_ID],
+  conductCases: [
+    THREAD_A_PRIOR_ALCOHOL_CONDUCT_CASE_ID,
+    THREAD_A_GUEST_POLICY_CONDUCT_CASE_ID,
+  ],
+  // R6+ will add notification-campaigns, eoc-activations; R7 adds asr-lines.
 } as const;

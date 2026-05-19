@@ -37,6 +37,17 @@ export { DOORS } from '../../../mocks/doors';
 export { BLUE_LIGHTS } from '../../../mocks/blue-lights';
 export { ACCESS_EVENTS, THREAD_A_AFTER_HOURS_COUNT } from '../../../mocks/access-events';
 export { CAMERA_EVENTS } from '../../../mocks/camera-events';
+export { BIT_CASES, THREAD_A_BIT_CASE } from '../../../mocks/bit-cases';
+export { BIT_EVIDENCE, THREAD_A_BIT_EVIDENCE } from '../../../mocks/bit-evidence';
+export { BIT_PLAN_ACTIONS, THREAD_A_BIT_PLAN_ACTIONS } from '../../../mocks/bit-plans';
+export { TIPS, THREAD_A_TIPS } from '../../../mocks/tips';
+export { LIVESAFE_CHATS, THREAD_A_LIVESAFE_CHATS } from '../../../mocks/livesafe-chats';
+export { TITLE_IX_CASES, THREAD_A_TITLE_IX_CASE } from '../../../mocks/title-ix-cases';
+export { CONDUCT_CASES, THREAD_A_CONDUCT_CASES } from '../../../mocks/conduct-cases';
+export { SANCTIONS, THREAD_A_SANCTIONS } from '../../../mocks/sanctions';
+export { EDU_PROGRAMS } from '../../../mocks/edu-programs';
+export { PARENTAL_NOTIFICATIONS, THREAD_A_PARENTAL_NOTIFICATIONS } from '../../../mocks/parental-notifications';
+export { INSIGHTS, THREAD_A_INSIGHTS } from '../../../mocks/insights';
 
 // ----- imports for computed helpers ---------------------------------------
 import { BUILDINGS } from '../../../mocks/buildings';
@@ -62,6 +73,17 @@ import { DOORS } from '../../../mocks/doors';
 import { BLUE_LIGHTS } from '../../../mocks/blue-lights';
 import { ACCESS_EVENTS } from '../../../mocks/access-events';
 import { CAMERA_EVENTS } from '../../../mocks/camera-events';
+import { BIT_CASES } from '../../../mocks/bit-cases';
+import { BIT_EVIDENCE } from '../../../mocks/bit-evidence';
+import { BIT_PLAN_ACTIONS } from '../../../mocks/bit-plans';
+import { TIPS } from '../../../mocks/tips';
+import { LIVESAFE_CHATS } from '../../../mocks/livesafe-chats';
+import { TITLE_IX_CASES } from '../../../mocks/title-ix-cases';
+import { CONDUCT_CASES } from '../../../mocks/conduct-cases';
+import { SANCTIONS } from '../../../mocks/sanctions';
+import { EDU_PROGRAMS } from '../../../mocks/edu-programs';
+import { PARENTAL_NOTIFICATIONS } from '../../../mocks/parental-notifications';
+import { INSIGHTS } from '../../../mocks/insights';
 import type {
   Building, ResidenceHall, Beat, Region, RegionId,
   Domain, DomainId,
@@ -76,6 +98,11 @@ import type {
   NoContactOrder, TrespassOrder,
   Camera, Door, BlueLight, ACSDoorEvent, CameraEvent,
   BuildingOccupancyEstimate,
+  BITCase, BITEvidence, BITPlanAction, BITRiskTier,
+  AnonymousTip, LiveSafeChat,
+  TitleIXCase,
+  ConductCase, ConductSubtype, Sanction, EduProgram, ParentalNotification,
+  Insight, InsightKind,
 } from '@/lib/types';
 import type { DqRuleRow } from '../../../mocks/dq-rules';
 
@@ -587,6 +614,117 @@ export function blueLightsOfflineCount(): number {
   return BLUE_LIGHTS.filter((b) => !b.isOnline).length;
 }
 
+// ====== BIT / Conduct / Title IX / Tips / Insights (R5) ====================
+
+export function getBITCase(id: string): BITCase | undefined {
+  return BIT_CASES.find((c) => c.id === id);
+}
+
+export function bitCasesByRiskTier(): Record<BITRiskTier, BITCase[]> {
+  return {
+    critical: BIT_CASES.filter((c) => c.riskTier === 'critical'),
+    elevated: BIT_CASES.filter((c) => c.riskTier === 'elevated'),
+    moderate: BIT_CASES.filter((c) => c.riskTier === 'moderate'),
+    mild: BIT_CASES.filter((c) => c.riskTier === 'mild'),
+  };
+}
+
+export function bitCasesByPerson(personId: string): BITCase[] {
+  return BIT_CASES.filter((c) => c.subjectPersonId === personId);
+}
+
+export function openBITCasesCount(): number {
+  return BIT_CASES.filter((c) => c.status !== 'closed').length;
+}
+
+export function bitEvidenceForCase(caseId: string): BITEvidence[] {
+  return BIT_EVIDENCE
+    .filter((e) => e.caseId === caseId)
+    .sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime());
+}
+
+export function bitPlanActionsForCase(caseId: string): BITPlanAction[] {
+  return BIT_PLAN_ACTIONS
+    .filter((a) => a.caseId === caseId)
+    .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
+}
+
+export function getTip(id: string): AnonymousTip | undefined {
+  return TIPS.find((t) => t.id === id);
+}
+
+export function tipsByPerson(personId: string): AnonymousTip[] {
+  return TIPS.filter((t) => t.matchedPersonId === personId);
+}
+
+export function tipsRoutedToBIT(): AnonymousTip[] {
+  return TIPS.filter((t) => t.routedTo === 'bit');
+}
+
+export function getLiveSafeChat(id: string): LiveSafeChat | undefined {
+  return LIVESAFE_CHATS.find((c) => c.id === id);
+}
+
+export function livesafeChatsForTip(tipId: string): LiveSafeChat[] {
+  return LIVESAFE_CHATS.filter((c) => c.tipId === tipId);
+}
+
+export function getTitleIXCase(id: string): TitleIXCase | undefined {
+  return TITLE_IX_CASES.find((c) => c.id === id);
+}
+
+export function titleIxCasesByPerson(personId: string): TitleIXCase[] {
+  return TITLE_IX_CASES.filter(
+    (c) => c.complainantPersonId === personId || c.respondentPersonId === personId,
+  );
+}
+
+export function getConductCase(id: string): ConductCase | undefined {
+  return CONDUCT_CASES.find((c) => c.id === id);
+}
+
+export function conductCasesByPerson(personId: string): ConductCase[] {
+  return CONDUCT_CASES.filter((c) => c.subjectPersonId === personId);
+}
+
+export function conductCasesBySubtype(subtype: ConductSubtype): ConductCase[] {
+  return CONDUCT_CASES.filter((c) => c.subtype === subtype);
+}
+
+export function openConductCasesCount(): number {
+  return CONDUCT_CASES.filter((c) => c.status !== 'closed' && c.status !== 'closed-amnesty').length;
+}
+
+export function sanctionsForCase(caseId: string): Sanction[] {
+  return SANCTIONS
+    .filter((s) => s.conductCaseId === caseId)
+    .sort((a, b) => new Date(a.issuedAt).getTime() - new Date(b.issuedAt).getTime());
+}
+
+export function sanctionsDueCount(): number {
+  return SANCTIONS.filter((s) => s.status === 'pending' || s.status === 'overdue').length;
+}
+
+export function getEduProgram(id: string): EduProgram | undefined {
+  return EDU_PROGRAMS.find((p) => p.id === id);
+}
+
+export function parentalNotificationsByPerson(personId: string): ParentalNotification[] {
+  return PARENTAL_NOTIFICATIONS.filter((p) => p.subjectPersonId === personId);
+}
+
+export function getInsight(id: string): Insight | undefined {
+  return INSIGHTS.find((i) => i.id === id);
+}
+
+export function insightsByKind(kind: InsightKind): Insight[] {
+  return INSIGHTS.filter((i) => i.kind === kind);
+}
+
+export function insightsForAsset(assetId: string): Insight[] {
+  return INSIGHTS.filter((i) => i.affectedAssets.includes(assetId));
+}
+
 // ====== Cross-narrative integrity check ===================================
 
 import { THREAD_ANCHOR_REGISTRY } from '../../../mocks/threads';
@@ -611,6 +749,15 @@ function runIntegrityCheck() {
   }
   for (const id of THREAD_ANCHOR_REGISTRY.pipelines) {
     if (!getPipeline(id)) missing.push(`pipeline: ${id}`);
+  }
+  for (const id of THREAD_ANCHOR_REGISTRY.bitCases) {
+    if (!getBITCase(id)) missing.push(`bit-case: ${id}`);
+  }
+  for (const id of THREAD_ANCHOR_REGISTRY.titleIxCases) {
+    if (!getTitleIXCase(id)) missing.push(`title-ix-case: ${id}`);
+  }
+  for (const id of THREAD_ANCHOR_REGISTRY.conductCases) {
+    if (!getConductCase(id)) missing.push(`conduct-case: ${id}`);
   }
   if (missing.length) {
     // eslint-disable-next-line no-console

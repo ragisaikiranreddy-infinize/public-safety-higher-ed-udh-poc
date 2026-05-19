@@ -4,11 +4,7 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '@/components/layout/app-shell';
 import { RoleProvider } from '@/lib/role-context';
 
-// R0/R1 routes. The remaining ~50 routes land incrementally:
-//   R2 — Pipeline live-run + Source onboarding wizard
-//   R3 — People + Incidents
-//   R4 — Campus map + Building intelligence
-//   R5 — Thread A (BIT)
+// R0/R1/R2/R3/R4/R5 routes wired. Remaining phases land incrementally:
 //   R6 — Thread B (EOC)
 //   R7 — Thread C (Clery)
 //   R8 — Module 5B Conduct + Governance
@@ -35,6 +31,11 @@ import CamerasPage from '@/routes/cameras';
 import CameraDetailPage from '@/routes/camera-detail';
 import AccessPage from '@/routes/access';
 import BuildingDetailPage from '@/routes/building-detail';
+import BITListPage from '@/routes/bit';
+import BITDetailPage from '@/routes/bit-detail';
+import TitleIXListPage from '@/routes/title-ix';
+import TitleIXDetailPage from '@/routes/title-ix-detail';
+import ConductDetailPage from '@/routes/conduct-detail';
 import NotFoundPage from '@/routes/not-found';
 
 import './styles/globals.css';
@@ -71,6 +72,13 @@ const router = createBrowserRouter([
       { path: 'cameras/:id', element: <CameraDetailPage /> },
       { path: 'access', element: <AccessPage /> },
       { path: 'access/buildings/:id', element: <BuildingDetailPage /> },
+
+      // Threat Intel + Title IX + Conduct (R5)
+      { path: 'bit', element: <BITListPage /> },
+      { path: 'bit/:id', element: <BITDetailPage /> },
+      { path: 'title-ix', element: <TitleIXListPage /> },
+      { path: 'title-ix/:id', element: <TitleIXDetailPage /> },
+      { path: 'conduct/:id', element: <ConductDetailPage /> },
 
       { path: '*', element: <NotFoundPage /> },
     ],

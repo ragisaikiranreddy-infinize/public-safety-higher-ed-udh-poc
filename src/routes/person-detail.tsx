@@ -9,7 +9,7 @@
  *   Title IX          — walled, visible only to Title IX coordinator
  *   AI Briefing       — placeholder (lands in R5)
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,17 +22,21 @@ import { BarrierIndicator } from '@/components/data-display/barrier-indicator';
 import { ClassificationBadge } from '@/components/data-display/classification-badge';
 import { PriorityChip } from '@/components/data-display/priority-chip';
 import { IdentityResolutionGraph } from '@/components/identity/identity-resolution-graph';
+import { BriefingCard } from '@/components/bit/briefing-card';
 import {
   getPerson,
   incidentsByPerson,
   vehiclesByPerson,
   noContactOrdersByPerson,
   trespassOrdersByPerson,
+  bitCasesByPerson,
+  titleIxCasesByPerson,
+  conductCasesByPerson,
 } from '@/lib/mock-db';
 import { useRole } from '@/lib/role-context';
 import { evaluateBarrier } from '@/lib/information-barriers';
+import { summarizeBITSubject } from '@/lib/ai/mock-ai';
 import { formatRelativeTime } from '@/lib/utils';
-import { Sparkles } from 'lucide-react';
 import NotFoundPage from './not-found';
 
 export default function PersonDetailPage() {
@@ -47,6 +51,14 @@ export default function PersonDetailPage() {
   const vehicles = vehiclesByPerson(person.id);
   const ncos = noContactOrdersByPerson(person.id);
   const trespasses = trespassOrdersByPerson(person.id);
+  const bitCases = bitCasesByPerson(person.id);
+  const tixCases = titleIxCasesByPerson(person.id);
+  const conductCases = conductCasesByPerson(person.id);
+
+  const briefing = useMemo(
+    () => summarizeBITSubject(person.id, role),
+    [person.id, role],
+  );
 
   // BIT tab barrier
   const bitBarrier = evaluateBarrier({
@@ -255,7 +267,7 @@ export default function PersonDetailPage() {
 
           {/* ===== BIT ===== */}
           <TabsContent value="bit">
-            {!person.inOpenBITCase ? (
+            {bitCases.length === 0 ? (
               <Card>
                 <CardContent className="p-6 text-center text-xs text-[var(--muted-foreground)]">
                   No BIT/CARE case is open for this person.
@@ -277,19 +289,59 @@ export default function PersonDetailPage() {
                 </CardContent>
               </Card>
             ) : (
-              <Card>
-                <CardContent className="p-6 text-center text-xs text-[var(--muted-foreground)]">
-                  BIT case content lands in R5 with the full AI briefing component. For now: case ID
-                  <code className="ml-1 font-mono">BIT-2026-0067</code>, risk level{' '}
-                  <Badge variant="warning">elevated</Badge> trending high.
-                </CardContent>
-              </Card>
+              <ul className="space-y-2">
+                {bitCases.map((c) => (
+                  <li key={c.id}>
+                    <Link to={`/bit/${encodeURIComponent(c.id)}`}>
+                      <Card className="transition-colors hover:bg-[var(--graphite-50)]">
+                        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono text-xs text-[var(--hub-700)]">{c.id}</span>
+                            <Badge variant={c.riskTier === 'critical' ? 'danger' : c.riskTier === 'elevated' ? 'warning' : 'muted'}>
+                              {c.riskTier}
+                            </Badge>
+                            <span className="text-[11px] text-[var(--muted-foreground)]">trending {c.riskTrend}</span>
+                          </div>
+                          <span className="text-[11px] text-[var(--muted-foreground)]">
+                            opened {formatRelativeTime(new Date(c.openedAt))}
+                          </span>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  </li>
+                ))}
+                {conductCases.length > 0 && (
+                  <li className="mt-4">
+                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                      Prior conduct cases ({conductCases.length})
+                    </div>
+                    <div className="space-y-1.5">
+                      {conductCases.map((cc) => (
+                        <Link
+                          key={cc.id}
+                          to={`/conduct/${encodeURIComponent(cc.id)}`}
+                          className="flex items-center justify-between rounded-md border bg-[var(--card)] p-3 text-xs hover:bg-[var(--graphite-50)]"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono">{cc.id}</span>
+                            <Badge variant="outline" className="text-[10px]">{cc.subtype}</Badge>
+                            <Badge variant="muted" className="text-[10px]">{cc.status}</Badge>
+                          </div>
+                          <span className="text-[10px] text-[var(--muted-foreground)]">
+                            {formatRelativeTime(new Date(cc.openedAt))}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </li>
+                )}
+              </ul>
             )}
           </TabsContent>
 
           {/* ===== Title IX ===== */}
           <TabsContent value="title-ix">
-            {!person.inOpenTitleIXCase ? (
+            {tixCases.length === 0 ? (
               <Card>
                 <CardContent className="p-6 text-center text-xs text-[var(--muted-foreground)]">
                   No Title IX case involves this person.
@@ -314,41 +366,43 @@ export default function PersonDetailPage() {
                 </CardContent>
               </Card>
             ) : (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle>Title IX involvement</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-xs">
-                  <div>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Case ID</span>
-                    <div className="mt-0.5 font-mono">TIX-2026-0014</div>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Status</span>
-                    <div className="mt-0.5">Informal intake · no formal complaint filed · supportive measures in place</div>
-                  </div>
-                  <p className="text-[11px] text-[var(--muted-foreground)]">
-                    Full case detail + supportive-measure tracking lands in R8 with the Title IX module.
-                  </p>
-                </CardContent>
-              </Card>
+              <ul className="space-y-2">
+                {tixCases.map((c) => (
+                  <li key={c.id}>
+                    <Link to={`/title-ix/${encodeURIComponent(c.id)}`}>
+                      <Card className="transition-colors hover:bg-[var(--graphite-50)]">
+                        <CardContent className="space-y-1 p-4">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs text-[var(--hub-700)]">{c.id}</span>
+                            <Badge variant="muted" className="text-[10px]">{c.phase}</Badge>
+                          </div>
+                          <div className="text-[11px] text-[var(--foreground)]">{c.headline}</div>
+                          <div className="text-[10px] text-[var(--muted-foreground)]">
+                            opened {formatRelativeTime(new Date(c.openedAt))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             )}
           </TabsContent>
 
           {/* ===== AI Briefing ===== */}
           <TabsContent value="ai">
-            <Card>
-              <CardContent className="space-y-3 p-6 text-center">
-                <Sparkles className="mx-auto h-8 w-8 text-[var(--hub-600)]" />
-                <p className="text-sm font-semibold text-[var(--foreground)]">AI Briefing (R5)</p>
-                <p className="text-xs text-[var(--muted-foreground)]">
-                  The multi-source AI briefing for this person lands in R5 with{' '}
-                  <code className="font-mono">summarizeBITSubject()</code>. It will assemble a 7-bullet
-                  summary from incidents · access patterns · tips · camera analytics · LMS engagement,
-                  with NaBITA-aligned risk classification and barrier-aware citations.
-                </p>
-              </CardContent>
-            </Card>
+            {bitCases.length > 0 ? (
+              <BriefingCard
+                briefing={briefing}
+                nabita={bitCases[0].nabita}
+              />
+            ) : (
+              <Card>
+                <CardContent className="p-6 text-center text-xs text-[var(--muted-foreground)]">
+                  {briefing.headline}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>

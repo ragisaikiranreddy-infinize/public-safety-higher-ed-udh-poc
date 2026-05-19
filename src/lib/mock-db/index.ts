@@ -63,6 +63,14 @@ export { GENERATOR_STATE, THREAD_B_GENERATOR_STATE } from '../../../mocks/genera
 export { ENV_SENSOR_READINGS } from '../../../mocks/env-sensors';
 export { SHUTTLE_ROUTES } from '../../../mocks/transit-routes';
 export { TRANSIT_GPS_PINGS } from '../../../mocks/transit-gps';
+export {
+  CLERY_POLYGON_SETS, THREAD_C_CLERY_POLYGON_SET,
+} from '../../../mocks/clery-geography';
+export { CLERY_ASR_WORKSPACE, THREAD_C_ASR_ROW } from '../../../mocks/clery-asr';
+export { CSA_REPORTS, THREAD_C_CSA_DISCLOSURE } from '../../../mocks/csa-reports';
+export { TIMELY_WARNINGS, THREAD_C_TIMELY_WARNING } from '../../../mocks/timely-warnings';
+export { NIBRIS_SUBMISSIONS } from '../../../mocks/nibris-submissions';
+export { FOIA_REQUESTS, THREAD_C_FOIA_REQUEST } from '../../../mocks/foia-requests';
 
 // ----- imports for computed helpers ---------------------------------------
 import { BUILDINGS } from '../../../mocks/buildings';
@@ -109,6 +117,12 @@ import { GENERATOR_STATE } from '../../../mocks/generator-state';
 import { ENV_SENSOR_READINGS } from '../../../mocks/env-sensors';
 import { SHUTTLE_ROUTES } from '../../../mocks/transit-routes';
 import { TRANSIT_GPS_PINGS } from '../../../mocks/transit-gps';
+import { CLERY_POLYGON_SETS } from '../../../mocks/clery-geography';
+import { CLERY_ASR_WORKSPACE } from '../../../mocks/clery-asr';
+import { CSA_REPORTS } from '../../../mocks/csa-reports';
+import { TIMELY_WARNINGS } from '../../../mocks/timely-warnings';
+import { NIBRIS_SUBMISSIONS } from '../../../mocks/nibris-submissions';
+import { FOIA_REQUESTS } from '../../../mocks/foia-requests';
 import type {
   Building, ResidenceHall, Beat, Region, RegionId,
   Domain, DomainId,
@@ -134,6 +148,8 @@ import type {
   NotificationCampaign, NotifCampaignStatus,
   FirePanelEvent, BMSAlarm, GeneratorState, EnvSensorReading,
   ShuttleRoute, TransitGPSPing,
+  CleryPolygonSet, ASRWorkspaceRow, CleryCrimeCategory, CleryGeographyClass,
+  CSAReport, TimelyWarning, NIBRSSubmission, FOIARequest, FOIAStatus,
 } from '@/lib/types';
 import type { DqRuleRow } from '../../../mocks/dq-rules';
 
@@ -903,6 +919,112 @@ export function transitPingsForRoute(routeId: string): TransitGPSPing[] {
   return TRANSIT_GPS_PINGS.filter((p) => p.routeId === routeId);
 }
 
+// ====== Clery + CSA + Timely Warning + NIBRS + FOIA (R7) ==================
+
+export function getCleryPolygonSet(id: string): CleryPolygonSet | undefined {
+  return CLERY_POLYGON_SETS.find((s) => s.id === id);
+}
+
+export function cleryPolygonSetsForYear(year: number): CleryPolygonSet[] {
+  return CLERY_POLYGON_SETS.filter((s) => s.reportingYear === year);
+}
+
+export function asrRowsForYear(year: number): ASRWorkspaceRow[] {
+  return CLERY_ASR_WORKSPACE.filter((r) => r.reportingYear === year);
+}
+
+export function asrRowsAwaitingReview(year: number): ASRWorkspaceRow[] {
+  return asrRowsForYear(year).filter(
+    (r) => r.needsReview || r.status === 'awaiting-review' || r.status === 'open',
+  );
+}
+
+export function getASRRow(id: string): ASRWorkspaceRow | undefined {
+  return CLERY_ASR_WORKSPACE.find((r) => r.id === id);
+}
+
+/** Build the (year, crime, geography) → row lookup map used by the ASR grid. */
+export function asrGridIndex(year: number): Map<string, ASRWorkspaceRow> {
+  const map = new Map<string, ASRWorkspaceRow>();
+  for (const row of asrRowsForYear(year)) {
+    map.set(`${row.crime}::${row.geography}`, row);
+  }
+  return map;
+}
+
+/** Cross-year totals per crime for the 3-year ASR Table 1 view. */
+export function asrCrimeTotals(year: number, crime: CleryCrimeCategory): {
+  geography: CleryGeographyClass;
+  count: number;
+}[] {
+  const rows = asrRowsForYear(year).filter((r) => r.crime === crime);
+  return rows.map((r) => ({ geography: r.geography, count: r.count }));
+}
+
+/** Reporting-year completeness — fraction of cells in reviewed/submitted state. */
+export function asrCompleteness(year: number): { reviewed: number; total: number; pct: number } {
+  const rows = asrRowsForYear(year);
+  const reviewed = rows.filter((r) => r.status === 'reviewed' || r.status === 'submitted').length;
+  return { reviewed, total: rows.length, pct: rows.length === 0 ? 0 : reviewed / rows.length };
+}
+
+export function getCSAReport(id: string): CSAReport | undefined {
+  return CSA_REPORTS.find((r) => r.id === id);
+}
+
+export function csaReportsAsrIncluded(): CSAReport[] {
+  return CSA_REPORTS.filter((r) => r.asrInclusion);
+}
+
+export function getTimelyWarning(id: string): TimelyWarning | undefined {
+  return TIMELY_WARNINGS.find((w) => w.id === id);
+}
+
+export function timelyWarningsForIncident(incidentId: string): TimelyWarning[] {
+  return TIMELY_WARNINGS.filter((w) => w.triggeringIncidentId === incidentId);
+}
+
+export function timelyWarningCounts(): {
+  issued: number;
+  declined: number;
+  pending: number;
+  avgMinutesToIssue: number | null;
+} {
+  const issued = TIMELY_WARNINGS.filter((w) => w.decision === 'issued');
+  const declined = TIMELY_WARNINGS.filter((w) => w.decision === 'declined');
+  const pending = TIMELY_WARNINGS.filter((w) => w.decision === 'pending');
+  const times = issued.map((w) => w.minutesToIssue).filter((m): m is number => typeof m === 'number');
+  const avg = times.length === 0 ? null : Math.round(times.reduce((s, v) => s + v, 0) / times.length);
+  return { issued: issued.length, declined: declined.length, pending: pending.length, avgMinutesToIssue: avg };
+}
+
+export function getNIBRSSubmission(id: string): NIBRSSubmission | undefined {
+  return NIBRIS_SUBMISSIONS.find((s) => s.id === id);
+}
+
+export function nibrsSubmissionsRejected(): NIBRSSubmission[] {
+  return NIBRIS_SUBMISSIONS.filter((s) => s.status === 'rejected');
+}
+
+export function getFOIARequest(id: string): FOIARequest | undefined {
+  return FOIA_REQUESTS.find((r) => r.id === id);
+}
+
+export function foiaRequestsByStatus(s: FOIAStatus): FOIARequest[] {
+  return FOIA_REQUESTS.filter((r) => r.status === s);
+}
+
+export function foiaRequestsOverdue(): FOIARequest[] {
+  const now = Date.now();
+  return FOIA_REQUESTS.filter(
+    (r) =>
+      r.status !== 'released' &&
+      r.status !== 'denied' &&
+      r.status !== 'closed' &&
+      new Date(r.dueAt).getTime() < now,
+  );
+}
+
 // ====== Cross-narrative integrity check ===================================
 
 import { THREAD_ANCHOR_REGISTRY } from '../../../mocks/threads';
@@ -945,6 +1067,21 @@ function runIntegrityCheck() {
   }
   for (const id of THREAD_ANCHOR_REGISTRY.notificationCampaigns) {
     if (!getNotificationCampaign(id)) missing.push(`notification-campaign: ${id}`);
+  }
+  for (const id of THREAD_ANCHOR_REGISTRY.cleryPolygonSets) {
+    if (!getCleryPolygonSet(id)) missing.push(`clery-polygon-set: ${id}`);
+  }
+  for (const id of THREAD_ANCHOR_REGISTRY.asrLines) {
+    if (!getASRRow(id)) missing.push(`asr-row: ${id}`);
+  }
+  for (const id of THREAD_ANCHOR_REGISTRY.timelyWarnings) {
+    if (!getTimelyWarning(id)) missing.push(`timely-warning: ${id}`);
+  }
+  for (const id of THREAD_ANCHOR_REGISTRY.foiaRequests) {
+    if (!getFOIARequest(id)) missing.push(`foia-request: ${id}`);
+  }
+  for (const id of THREAD_ANCHOR_REGISTRY.incidents) {
+    if (!getIncident(id)) missing.push(`incident: ${id}`);
   }
   if (missing.length) {
     // eslint-disable-next-line no-console

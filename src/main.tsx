@@ -4,8 +4,7 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '@/components/layout/app-shell';
 import { RoleProvider } from '@/lib/role-context';
 
-// R0–R6 routes wired. Remaining phases land incrementally:
-//   R7 — Thread C (Clery)
+// R0–R7 routes wired. Remaining phases land incrementally:
 //   R8 — Module 5B Conduct + Governance
 //   R9 — Polish, copilots, AI surfaces, demo script
 //
@@ -44,6 +43,12 @@ import NotificationDetailPage from '@/routes/notification-detail';
 import LockdownsPage from '@/routes/lockdowns';
 import TransitPage from '@/routes/transit';
 import FacilitiesPage from '@/routes/facilities';
+import CleryPage from '@/routes/clery';
+import CleryASRPage from '@/routes/clery-asr';
+import CleryGeographyPage from '@/routes/clery-geography';
+import NIBRISPage from '@/routes/nibris';
+import FOIAPage from '@/routes/foia';
+import FOIADetailPage from '@/routes/foia-detail';
 import NotFoundPage from '@/routes/not-found';
 
 import './styles/globals.css';
@@ -98,6 +103,14 @@ const router = createBrowserRouter([
       { path: 'access/lockdowns', element: <LockdownsPage /> },
       { path: 'transit', element: <TransitPage /> },
       { path: 'facilities', element: <FacilitiesPage /> },
+
+      // Clery + NIBRS + FOIA (R7)
+      { path: 'clery', element: <CleryPage /> },
+      { path: 'clery/asr/:year', element: <CleryASRPage /> },
+      { path: 'clery/geography', element: <CleryGeographyPage /> },
+      { path: 'nibris', element: <NIBRISPage /> },
+      { path: 'foia', element: <FOIAPage /> },
+      { path: 'foia/requests/:id', element: <FOIADetailPage /> },
 
       { path: '*', element: <NotFoundPage /> },
     ],

@@ -14,8 +14,12 @@
  *   - eocCopilot(activationId, prompt)  → operational copilot (canned)
  *   - draftAAR(activationId)            → after-action report draft (canned)
  *
+ * R7 surface — Thread C (Clery):
+ *   - classifyCleryEvent(incidentId)    → Clery crime + geography classification
+ *   - cleryCopilot(prompt)              → compliance copilot (canned)
+ *   - redactFoia(requestId)             → AI-assisted redaction preview
+ *
  * Later phases extend:
- *   R7  — classifyCleryEvent, cleryCopilot
  *   R8  — conductCopilot, parentalNotifFerpaAid, hazingClassifier, amnestyAid
  *   R9  — askPlatform, cohortFromNL, buildDashboardFromNL
  */
@@ -29,7 +33,11 @@ import {
   THREAD_B_INITIAL_CAMPAIGN_ID,
   THREAD_B_REDIRECT_CAMPAIGN_ID,
   THREAD_B_FAILED_GENERATOR_BUILDING_ID,
+  THREAD_C_TRIGGERING_INCIDENT_ID,
+  THREAD_C_ASR_LINE_ID,
+  THREAD_C_FOIA_REQUEST_ID,
 } from '../../../mocks/threads';
+import type { CleryCrimeCategory, CleryGeographyClass } from '../types';
 import { evaluateBarrier } from '../information-barriers';
 
 // =========================================================================
@@ -652,3 +660,266 @@ export function draftAAR(activationId: string): AIAAR {
 void THREAD_B_INITIAL_CAMPAIGN_ID;
 void THREAD_B_REDIRECT_CAMPAIGN_ID;
 void THREAD_B_FAILED_GENERATOR_BUILDING_ID;
+
+// =========================================================================
+// classifyCleryEvent — Clery classification suggestion for an incident
+// =========================================================================
+
+export interface AICleryClassification {
+  available: boolean;
+  /** Whether the incident appears Clery-reportable. */
+  reportable: boolean;
+  /** Suggested crime category. */
+  crime: CleryCrimeCategory | null;
+  /** Suggested geography class. */
+  geography: CleryGeographyClass | null;
+  /** Confidence (0..100). */
+  confidence: number;
+  /** Rationale paragraph. */
+  rationale: string;
+  /** Items flagged for human review. */
+  reviewFlags: string[];
+  /** Lineage trace back to Bronze. */
+  lineage: { dataset: string; rowRef: string }[];
+  /** Optional ASR cell ID this classification would feed. */
+  asrLineItemId?: string;
+}
+
+export function classifyCleryEvent(incidentId: string): AICleryClassification {
+  if (incidentId === THREAD_C_TRIGGERING_INCIDENT_ID) {
+    return {
+      available: true,
+      reportable: true,
+      crime: 'sex-offense-rape',
+      geography: 'on-campus-residential',
+      confidence: 96,
+      rationale:
+        'Call type ASSAULT-SEXUAL with NIBRS code 13A maps to the Clery "Sex Offenses — Rape" ' +
+        'category. Building BLD-CARTER-HALL is classified on-campus-residential in the certified ' +
+        '2025 polygon set (CGP-MAIN-CAMPUS-2025). VAWA-eligible. Continuing-threat assessment ' +
+        'concluded a Timely Warning was warranted (issued 38 min after receipt).',
+      reviewFlags: [
+        'Title IX cross-reference exists — confirm §99.32(c) reportable status with Title IX coordinator.',
+      ],
+      lineage: [
+        { dataset: 'cad.events_raw', rowRef: 'cad_event_uuid:8f5e2a1c-...' },
+        { dataset: 'rms.case_raw', rowRef: 'rms_case_number:25-08812' },
+        { dataset: 'incidents.conformed', rowRef: 'INC-2025-08812' },
+        { dataset: 'mart.clery_asr_workspace', rowRef: THREAD_C_ASR_LINE_ID },
+      ],
+      asrLineItemId: THREAD_C_ASR_LINE_ID,
+    };
+  }
+  return {
+    available: true,
+    reportable: false,
+    crime: null,
+    geography: null,
+    confidence: 22,
+    rationale:
+      'Insufficient signal to recommend a Clery classification. Manual review recommended; verify ' +
+      'call-type taxonomy mapping and geography determination before posting to the workspace.',
+    reviewFlags: ['Manual classification required.'],
+    lineage: [{ dataset: 'cad.events_raw', rowRef: `incident:${incidentId}` }],
+  };
+}
+
+// =========================================================================
+// cleryCopilot — compliance copilot (canned for Thread C)
+// =========================================================================
+
+export interface AICleryCopilotResult {
+  available: boolean;
+  reply: string;
+  citations: AICitation[];
+}
+
+/**
+ * Three canned intents tied to Thread C:
+ *   - "asr" / "table" / "completeness"   → ASR workbench summary
+ *   - "geography" / "polygon"            → geography certification posture
+ *   - "warning" / "timely"               → Timely Warning ledger summary
+ */
+export function cleryCopilot(prompt: string, _actorRole: RoleId): AICleryCopilotResult {
+  const q = prompt.toLowerCase().trim();
+
+  if (q.includes('asr') || q.includes('table') || q.includes('completeness') || q.includes('annual')) {
+    return {
+      available: true,
+      reply:
+        'The 2025 ASR workspace is 73% reviewed. The Thread C cell — Sex Offenses · On-Campus Residential — is ' +
+        'reviewed and submitted with 3 incidents linked. Two cells in the matrix are still awaiting review: ' +
+        'Burglary · On-Campus and Stalking · Public Property. Source-to-line lineage is live: every cell traces ' +
+        'back to bronze.cad.events_raw + bronze.rms.case_raw.',
+      citations: [
+        {
+          kind: 'dataset',
+          refId: 'mart.clery_asr_workspace',
+          label: 'mart.clery_asr_workspace',
+          linkedRoute: '/catalog/mart.clery_asr_workspace',
+          classification: 'public',
+        },
+      ],
+    };
+  }
+
+  if (q.includes('geography') || q.includes('polygon') || q.includes('clery')) {
+    return {
+      available: true,
+      reply:
+        'The 2025 polygon set CGP-MAIN-CAMPUS-2025 is certified (30 days ago). Eight audit-history entries trace ' +
+        'every classification change since the initial ingest. The most recent change excluded the Health Center ' +
+        'counseling-center suite from on-campus per the 42 CFR Part 2 / Clery interaction memo.',
+      citations: [
+        {
+          kind: 'dataset',
+          refId: 'mart.clery_asr_workspace',
+          label: 'mart.clery_asr_workspace',
+          linkedRoute: '/clery/geography',
+          classification: 'public',
+        },
+      ],
+    };
+  }
+
+  if (q.includes('warning') || q.includes('timely')) {
+    return {
+      available: true,
+      reply:
+        'Eight Timely Warnings on the ledger this reporting year: 5 issued, 2 declined, 1 pending. The Thread C ' +
+        'warning TWR-2025-0029 was issued 38 minutes after incident receipt — well within the 60-minute target. ' +
+        'Continuing-threat assessment narratives are captured on every decision, including the declines.',
+      citations: [
+        {
+          kind: 'incident',
+          refId: 'TWR-2025-0029',
+          label: 'TWR-2025-0029',
+          classification: 'public',
+        },
+      ],
+    };
+  }
+
+  return {
+    available: true,
+    reply:
+      'I can speak to the ASR workspace + completeness, the geography polygon set + audit history, or the ' +
+      'Timely Warning ledger. What would you like to know?',
+    citations: [],
+  };
+}
+
+// =========================================================================
+// redactFoia — AI-assisted redaction preview for a FOIA request
+// =========================================================================
+
+export interface AIRedactionResult {
+  available: boolean;
+  requestId: string;
+  /** Top-line headline shown above the preview. */
+  headline: string;
+  /** Source records included in scope. */
+  recordCount: number;
+  /** Total field-level masks proposed. */
+  totalMasks: number;
+  /** Per-classification mask counts. */
+  maskedByClassification: Partial<Record<Classification, number>>;
+  /** Per-field mask counts. */
+  maskedByField: Record<string, number>;
+  /** Redacted sample excerpt for the preview pane. */
+  sampleExcerpt: string;
+  /** Confidence 0..100. */
+  confidence: number;
+  /** Items flagged for attorney review with rationale. */
+  attorneyReviewItems: { item: string; reason: string }[];
+  /** Streaming-plan tokens for the demo. */
+  streamingPlan: { text: string; delayMs: number }[];
+  /** Model attribution. */
+  model: { name: string; version: string; promptTokens: number; completionTokens: number };
+}
+
+export function redactFoia(requestId: string): AIRedactionResult {
+  if (requestId !== THREAD_C_FOIA_REQUEST_ID) {
+    return {
+      available: true,
+      requestId,
+      headline: 'No AI redaction preview available for this request.',
+      recordCount: 0,
+      totalMasks: 0,
+      maskedByClassification: {},
+      maskedByField: {},
+      sampleExcerpt: '',
+      confidence: 0,
+      attorneyReviewItems: [],
+      streamingPlan: [{ text: 'No applicable records in scope.', delayMs: 30 }],
+      model: { name: 'FOIA-Redactor', version: 'v0.4.0', promptTokens: 320, completionTokens: 22 },
+    };
+  }
+  return {
+    available: true,
+    requestId,
+    headline:
+      'Three incidents in scope (the 2025 Sex Offenses · On-Campus Residential cell). 47 proposed field-level ' +
+      'masks across PII, CJI, restricted-investigation, and title-ix-sensitive classifications. 3 items flagged ' +
+      'for attorney review.',
+    recordCount: 3,
+    totalMasks: 47,
+    maskedByClassification: {
+      'pii': 18,
+      'cji': 12,
+      'restricted-investigation': 14,
+      'title-ix-sensitive': 3,
+    },
+    maskedByField: {
+      'caller_phone': 3,
+      'narrative': 14,
+      'reporter_name': 3,
+      'reporter_address': 3,
+      'subject_name': 6,
+      'subject_dob': 3,
+      'license_plate': 2,
+      'officer_name': 9,
+      'witness_name': 4,
+    },
+    sampleExcerpt:
+      'INC-2025-08812 — [REDACTED: caller_phone] reporting an [PII MASKED] involving [TITLE IX WALLED] ' +
+      'at [BLD-CARTER-HALL] residential common area. Reporting Officer: [OFFICER MASKED — name + badge]. ' +
+      'Witness statement attached: [REDACTED — restricted-investigation hold pending case closure]. ' +
+      'NIBRS Offense: 13A — Sex Offense. Clery Geography: On-Campus Residential. Classification: ' +
+      'restricted-investigation.',
+    confidence: 87,
+    attorneyReviewItems: [
+      {
+        item: 'Witness statement excerpt at line 4',
+        reason: 'AI confidence 64% — borderline whether to mask further or release with party consent.',
+      },
+      {
+        item: 'Officer-name reference in narrative paragraph 2',
+        reason: 'Confirm pseudonymization policy with General Counsel before release.',
+      },
+      {
+        item: 'Title IX cross-reference in INC-2025-08812 narrative',
+        reason: 'Verify §99.31 release rationale before disclosure.',
+      },
+    ],
+    streamingPlan: [
+      { text: 'Scoping responsive records', delayMs: 220 },
+      { text: '… reading incidents.conformed (3 records)', delayMs: 220 },
+      { text: '… reading rms.case_raw (3 case files)', delayMs: 220 },
+      { text: '… evaluating classification at field level', delayMs: 280 },
+      { text: '… applying CJIS / FERPA / Title IX redaction rules', delayMs: 280 },
+      { text: '… scoring confidence + flagging attorney-review items', delayMs: 220 },
+      { text: 'Done.', delayMs: 180 },
+    ],
+    model: {
+      name: 'FOIA-Redactor',
+      version: 'v0.4.0',
+      promptTokens: 1860,
+      completionTokens: 412,
+    },
+  };
+}
+
+void THREAD_C_TRIGGERING_INCIDENT_ID;
+void THREAD_C_ASR_LINE_ID;
+void THREAD_C_FOIA_REQUEST_ID;

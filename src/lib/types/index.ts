@@ -1334,7 +1334,228 @@ export interface EnvSensorReading {
   isAnomalous: boolean;
 }
 
-// §16 Compliance — still stubbed; lands in R7.
+// =========================================================================
+// §16 — Compliance (Clery + CSA + Timely Warning + NIBRS + FOIA) (R7)
+// =========================================================================
+
+/**
+ * Clery-mandatory crime categories. Per the Clery Handbook (Sep 2024),
+ * the ASR Table reports counts across these crime + geography combinations.
+ *
+ * Order matters: criminal offenses → VAWA additions → arrests → referrals.
+ * Hate-crime bias categories are tracked separately on the incident.
+ */
+export type CleryCrimeCategory =
+  // Part I criminal offenses
+  | 'murder-nonneg-manslaughter'
+  | 'negligent-manslaughter'
+  | 'sex-offense-rape'
+  | 'sex-offense-fondling'
+  | 'sex-offense-incest'
+  | 'sex-offense-statutory'
+  | 'robbery'
+  | 'aggravated-assault'
+  | 'burglary'
+  | 'motor-vehicle-theft'
+  | 'arson'
+  // VAWA additions (2013 reauthorization)
+  | 'domestic-violence'
+  | 'dating-violence'
+  | 'stalking'
+  // Arrests
+  | 'arrest-weapons'
+  | 'arrest-drug-abuse'
+  | 'arrest-liquor'
+  // Disciplinary referrals
+  | 'referral-weapons'
+  | 'referral-drug-abuse'
+  | 'referral-liquor';
+
+/** Hate-crime bias categories — per the Clery Handbook. */
+export type HateCrimeBias =
+  | 'race'
+  | 'religion'
+  | 'sexual-orientation'
+  | 'gender'
+  | 'gender-identity'
+  | 'disability'
+  | 'ethnicity'
+  | 'national-origin';
+
+// ----- Clery geography (polygon set + audit) ------------------------------
+
+export type CleryPolygonChangeKind = 'added' | 'removed' | 'modified' | 'reclassified';
+
+export interface CleryPolygonAuditEntry {
+  id: string;
+  at: string;
+  authorPersonId: string;
+  changeKind: CleryPolygonChangeKind;
+  polygonId: string;
+  notes: string;
+}
+
+export interface CleryPolygon {
+  id: string;
+  name: string;
+  cleryClass: CleryGeographyClass;
+  geometry: GeoPolygon;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  /** Optional building this polygon corresponds to (one-to-many). */
+  buildingId?: string;
+}
+
+export interface CleryPolygonSet {
+  id: string;                       // 'CGP-MAIN-CAMPUS-2025'
+  name: string;
+  reportingYear: number;
+  polygons: CleryPolygon[];
+  audit: CleryPolygonAuditEntry[];
+  certifiedAt?: string;
+  certifiedByPersonId?: string;
+  classification: Classification;
+}
+
+// ----- ASR workspace -------------------------------------------------------
+
+export type ASRCellStatus = 'open' | 'awaiting-review' | 'reviewed' | 'submitted';
+
+export interface ASRWorkspaceRow {
+  id: string;                       // 'ASR-2025-RESHALL-SEXOFF'
+  reportingYear: number;
+  crime: CleryCrimeCategory;
+  geography: CleryGeographyClass;
+  /** Count of qualifying incidents. */
+  count: number;
+  /** Source incident IDs the count was drawn from. */
+  sourceIncidentIds: string[];
+  /** Whether this cell requires manual review (geography or classification ambiguity). */
+  needsReview: boolean;
+  reviewNote?: string;
+  status: ASRCellStatus;
+  /** Bronze dataset refs for the source-to-line lineage trace. */
+  bronzeRefIds: string[];
+  lastReviewedByPersonId?: string;
+  lastReviewedAt?: string;
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
+
+// ----- CSA (Campus Security Authority) reports -----------------------------
+
+export type CSAReportSource = 'training-acknowledgment' | 'incident-disclosure' | 'annual-attestation';
+
+export interface CSAReport {
+  id: string;                       // 'CSA-2026-...'
+  reportedByPersonId: string;
+  reportedAt: string;
+  source: CSAReportSource;
+  summary: string;
+  asrInclusion: boolean;
+  asrLineItemId?: string;
+  classification: Classification;
+}
+
+// ----- Timely Warning ledger -----------------------------------------------
+
+export type TimelyWarningDecision = 'issued' | 'declined' | 'pending';
+
+export interface TimelyWarning {
+  id: string;                       // 'TWR-2025-0029'
+  triggeringIncidentId: string;
+  reportingYear: number;
+  decision: TimelyWarningDecision;
+  decidedAt: string;
+  decidedByRole: RoleId;
+  /** Time from incident receipt to warning issuance (minutes). */
+  minutesToIssue?: number;
+  /** Was the offense VAWA-eligible? */
+  vawaEligible: boolean;
+  /** Continuing-threat assessment narrative — the §99.32(c) reason. */
+  continuingThreatAssessment: string;
+  /** Optional linked notification campaign. */
+  linkedCampaignId?: string;
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
+
+// ----- NIBRS submissions ---------------------------------------------------
+
+export type NIBRSStatus = 'in-progress' | 'submitted' | 'accepted' | 'rejected' | 'resubmitted';
+
+export interface NIBRSSubmission {
+  id: string;                       // 'NIBRS-2026-Q1'
+  reportingPeriod: string;          // 'Q1-2026', '04-2026', etc.
+  status: NIBRSStatus;
+  submittedAt?: string;
+  acceptedAt?: string;
+  rejectedAt?: string;
+  recordCount: number;
+  errorCount: number;
+  rejectionNote?: string;
+  classification: Classification;
+}
+
+// ----- FOIA requests + AI-assisted redaction -------------------------------
+
+export type FOIAStatus =
+  | 'received'
+  | 'in-review'
+  | 'ai-redaction-draft'
+  | 'attorney-review'
+  | 'ready-for-release'
+  | 'released'
+  | 'denied'
+  | 'closed';
+
+export type FOIARequesterAffiliation =
+  | 'student'
+  | 'public'
+  | 'press'
+  | 'attorney'
+  | 'researcher'
+  | 'government';
+
+/** Per-classification + per-field masking counts in the AI redaction preview. */
+export interface FOIARedactionPreview {
+  recordCount: number;
+  /** Total field-level masks proposed. */
+  totalMasks: number;
+  /** Breakdown by classification of the source values masked. */
+  maskedByClassification: Partial<Record<Classification, number>>;
+  /** Breakdown by field name (e.g. 'narrative', 'caller_phone'). */
+  maskedByField: Record<string, number>;
+  /** Sample redacted excerpt rendered in the preview pane. */
+  sampleExcerpt: string;
+  /** Confidence score for the redaction (0..100). */
+  aiConfidence: number;
+  /** Items flagged for attorney review (low confidence or sensitive). */
+  attorneyReviewItems: string[];
+}
+
+export interface FOIARequest {
+  id: string;                       // 'FOIA-2026-077'
+  requesterName: string;
+  requesterAffiliation: FOIARequesterAffiliation;
+  receivedAt: string;
+  /** Statutory due date — typically 20 business days from receipt. */
+  dueAt: string;
+  status: FOIAStatus;
+  /** Free-text description of the request. */
+  request: string;
+  /** Scope — what records are responsive. */
+  scope: {
+    incidentIds: string[];
+    dateRangeStart?: string;
+    dateRangeEnd?: string;
+    crimeCategories?: CleryCrimeCategory[];
+    description?: string;
+  };
+  redactionPreview?: FOIARedactionPreview;
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
 
 // =========================================================================
 // §17 — Catalog / dataset / lineage / pipeline

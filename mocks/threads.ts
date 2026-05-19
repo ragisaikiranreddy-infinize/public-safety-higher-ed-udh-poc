@@ -157,5 +157,12 @@ export const THREAD_ANCHOR_REGISTRY = {
   weatherAlerts: [THREAD_B_WEATHER_ALERT_ID],
   eocActivations: [THREAD_B_EOC_ACTIVATION_ID],
   notificationCampaigns: [THREAD_B_INITIAL_CAMPAIGN_ID, THREAD_B_REDIRECT_CAMPAIGN_ID],
-  // R7 adds asr-lines + clery polygon set + foia request.
+  cleryPolygonSets: [THREAD_C_CLERY_POLYGON_SET_ID],
+  asrLines: [THREAD_C_ASR_LINE_ID],
+  timelyWarnings: [THREAD_C_TIMELY_WARNING_ID],
+  foiaRequests: [THREAD_C_FOIA_REQUEST_ID],
+  incidents: [
+    THREAD_C_TRIGGERING_INCIDENT_ID,
+    ...THREAD_C_RELATED_INCIDENT_IDS,
+  ],
 } as const;

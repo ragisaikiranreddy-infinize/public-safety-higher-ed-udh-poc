@@ -27,6 +27,8 @@ import {
   shelterDesignatedBuildings,
   totalResidentialOccupancy,
   totalResidentialCapacity,
+  activeWeatherAlerts,
+  activeEOCActivations,
 } from '@/lib/mock-db';
 import { currentSemester, currentShift } from '@/lib/time';
 import {
@@ -36,7 +38,10 @@ import {
   ShieldCheck,
   MapPin,
   Sparkles,
+  AlertOctagon,
+  Siren,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface KpiSpec {
   id: string;
@@ -305,6 +310,9 @@ export default function HomePage() {
       />
 
       <div className="space-y-6 px-8 py-6">
+        {/* Active EOC + Weather banner — Thread B trigger surface */}
+        <EOCBanner />
+
         {/* KPI strip — role-aware, top 4 from homeKpiOrder */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((k) => {
@@ -475,6 +483,69 @@ function Row({
         {label}
       </div>
       <div className="font-display text-base font-semibold">{value}</div>
+    </div>
+  );
+}
+
+/**
+ * EOCBanner — surfaces active weather alerts + active EOC activations on the
+ * Command Center. When the Thread B tornado warning is live (and the
+ * activation is open), this is the "click to enter EOC" entry point.
+ */
+function EOCBanner() {
+  const weather = activeWeatherAlerts();
+  const activations = activeEOCActivations();
+
+  if (weather.length === 0 && activations.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      {weather.map((w) => (
+        <div
+          key={w.id}
+          className="flex items-start gap-3 rounded-md border border-[var(--signal-red)]/60 bg-[var(--signal-red-soft)]/30 p-4"
+        >
+          <AlertOctagon className="mt-0.5 h-5 w-5 text-[var(--signal-red)]" />
+          <div className="flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="danger" className="text-[10px]">{w.kind}</Badge>
+              <Badge variant="warning" className="text-[10px]">{w.severity}</Badge>
+              <span className="text-[10px] font-mono text-[var(--muted-foreground)]">{w.id}</span>
+            </div>
+            <p className="mt-1 text-sm font-semibold">{w.headline}</p>
+            <p className="mt-1 text-[12px] leading-relaxed text-[var(--muted-foreground)]">
+              {w.raw.slice(0, 220)}…
+            </p>
+          </div>
+          <Link
+            to="/eoc"
+            className="rounded-md bg-[var(--signal-red)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+          >
+            Open EOC →
+          </Link>
+        </div>
+      ))}
+      {activations.map((a) => (
+        <Link
+          key={a.id}
+          to={`/eoc/activations/${encodeURIComponent(a.id)}`}
+          className="flex items-start gap-3 rounded-md border border-[var(--signal-amber)]/60 bg-[var(--signal-amber-soft)]/30 p-4 transition-colors hover:bg-[var(--signal-amber-soft)]/50"
+        >
+          <Siren className="mt-0.5 h-5 w-5 text-[var(--signal-amber)]" />
+          <div className="flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="warning" className="text-[10px]">{a.level} activation</Badge>
+              {a.threadTag && <Badge variant="accent" className="text-[10px]">Thread {a.threadTag}</Badge>}
+              <span className="font-mono text-[10px] text-[var(--muted-foreground)]">{a.id}</span>
+            </div>
+            <p className="mt-1 text-sm font-semibold">{a.name}</p>
+            <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-[var(--muted-foreground)]">{a.narrative}</p>
+          </div>
+          <span className="text-xs font-semibold text-[var(--signal-amber)]">
+            Open COP →
+          </span>
+        </Link>
+      ))}
     </div>
   );
 }

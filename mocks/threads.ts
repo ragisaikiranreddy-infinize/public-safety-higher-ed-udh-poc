@@ -154,5 +154,8 @@ export const THREAD_ANCHOR_REGISTRY = {
     THREAD_A_PRIOR_ALCOHOL_CONDUCT_CASE_ID,
     THREAD_A_GUEST_POLICY_CONDUCT_CASE_ID,
   ],
-  // R6+ will add notification-campaigns, eoc-activations; R7 adds asr-lines.
+  weatherAlerts: [THREAD_B_WEATHER_ALERT_ID],
+  eocActivations: [THREAD_B_EOC_ACTIVATION_ID],
+  notificationCampaigns: [THREAD_B_INITIAL_CAMPAIGN_ID, THREAD_B_REDIRECT_CAMPAIGN_ID],
+  // R7 adds asr-lines + clery polygon set + foia request.
 } as const;

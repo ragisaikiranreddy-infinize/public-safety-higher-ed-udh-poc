@@ -955,9 +955,386 @@ export interface BlueLight {
 }
 
 // =========================================================================
-// §12 Mass notification (R6); §13 EOC & emergency (R6); §14 Transportation
-// (R8); §15 Facilities/IoT (R6); §16 Compliance (R7) — all stubbed.
+// §12 — Mass Notification (R6)
 // =========================================================================
+
+export type NotifChannel = 'sms' | 'voice' | 'email' | 'push' | 'desktop-alert' | 'digital-sign' | 'siren';
+
+export type NotifAudience =
+  | 'campus-all'
+  | 'students-all'
+  | 'employees-all'
+  | 'building-residents'
+  | 'building-occupants'
+  | 'beat-area'
+  | 'opt-in-emergency'
+  | 'shuttle-riders';
+
+export type NotifCampaignStatus =
+  | 'draft'
+  | 'review'
+  | 'queued'
+  | 'sending'
+  | 'sent'
+  | 'paused'
+  | 'cancelled';
+
+export interface NotifChannelDelivery {
+  channel: NotifChannel;
+  attempted: number;
+  delivered: number;
+  failed: number;
+  /** Seconds between queue and delivery confirmation (P50/P95). */
+  latencyP50Sec: number;
+  latencyP95Sec: number;
+}
+
+export interface NotificationCampaign {
+  id: string;                            // 'MNP-2026-088'
+  name: string;
+  status: NotifCampaignStatus;
+  /** Free text — the alert content (subject + body collapsed). */
+  message: string;
+  audiences: NotifAudience[];
+  /** Buildings included when audience is building-* or beat-*. */
+  buildingIds: string[];
+  channels: NotifChannel[];
+  /** Per-channel delivery rollup. */
+  delivery: NotifChannelDelivery[];
+  createdAt: string;
+  /** Set when transitioning from queued → sending. */
+  sentAt?: string;
+  /** Optional EOC activation that triggered this campaign. */
+  triggeredByActivationId?: string;
+  /** Sender role. */
+  authoredByRole: RoleId;
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
+
+// =========================================================================
+// §13 — EOC & emergency (R6)
+// =========================================================================
+
+export type EOCActivationLevel = 'monitoring' | 'partial' | 'full' | 'after-action';
+
+export type EOCActivationStatus = 'active' | 'closed';
+
+export type EOCIncidentKind =
+  | 'tornado'
+  | 'severe-weather'
+  | 'active-threat'
+  | 'fire'
+  | 'hazmat'
+  | 'utility-outage'
+  | 'medical-mass-casualty'
+  | 'civil-unrest'
+  | 'drill';
+
+/** ICS Form 207 (positions) row — who's filling which seat. */
+export type ICSPosition =
+  | 'incident-commander'
+  | 'public-information-officer'
+  | 'safety-officer'
+  | 'liaison-officer'
+  | 'operations-section-chief'
+  | 'planning-section-chief'
+  | 'logistics-section-chief'
+  | 'finance-section-chief';
+
+export interface ICSAssignment {
+  position: ICSPosition;
+  /** Resolved Person Master ID; undefined → seat unfilled. */
+  personId?: string;
+  assignedAt: string;
+  /** UI hint — render an "Unfilled" pill. */
+  isUnfilled?: boolean;
+}
+
+export interface EOCActivation {
+  id: string;                            // 'EOC-2026-013'
+  name: string;                          // 'Tornado Warning — central campus'
+  level: EOCActivationLevel;
+  status: EOCActivationStatus;
+  kind: EOCIncidentKind;
+  triggeredByAlertId?: string;
+  openedAt: string;
+  closedAt?: string;
+  /** Buildings the activation spans (shelter-in-place, evacuation). */
+  buildingIds: string[];
+  /** Campaign IDs sent under this activation. */
+  campaignIds: string[];
+  /** Lockdown IDs initiated. */
+  lockdownIds: string[];
+  /** Runbooks queued or executed. */
+  runbookExecutionIds: string[];
+  /** ICS 207 seats. */
+  ics: ICSAssignment[];
+  /** Brief narrative — opens the COP card. */
+  narrative: string;
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
+
+/** Situation Log entry — chronological factual log. */
+export type SitLogEntryKind =
+  | 'alert-received'
+  | 'activation-opened'
+  | 'campaign-sent'
+  | 'lockdown-initiated'
+  | 'lockdown-released'
+  | 'runbook-started'
+  | 'runbook-step-completed'
+  | 'iot-anomaly'
+  | 'unit-assigned'
+  | 'general-observation'
+  | 'decision'
+  | 'activation-closed';
+
+export interface SitLogEntry {
+  id: string;
+  activationId: string;
+  at: string;
+  kind: SitLogEntryKind;
+  text: string;
+  authorRole?: RoleId;
+  /** Cross-reference IDs the entry mentions. */
+  references?: string[];
+  classification: Classification;
+}
+
+/** Decision Log entry — formal decisions w/ rationale (FEMA / Stafford Act audit trail). */
+export interface DecisionLogEntry {
+  id: string;
+  activationId: string;
+  at: string;
+  decision: string;                      // headline
+  rationale: string;
+  authorRole: RoleId;
+  authorPersonId?: string;
+  alternativesConsidered?: string[];
+  classification: Classification;
+}
+
+/** Weather alert (NWS feed). */
+export type WeatherAlertKind =
+  | 'tornado-warning'
+  | 'tornado-watch'
+  | 'severe-thunderstorm'
+  | 'flash-flood'
+  | 'winter-storm'
+  | 'heat-advisory'
+  | 'wind-advisory';
+
+export interface WeatherAlert {
+  id: string;                            // 'NWS-TOR-2026-IA-001'
+  kind: WeatherAlertKind;
+  headline: string;
+  severity: 'extreme' | 'severe' | 'moderate' | 'minor';
+  certainty: 'observed' | 'likely' | 'possible';
+  issuedAt: string;
+  expiresAt: string;
+  /** Counties / zones in the affected polygon. */
+  affectedZones: string[];
+  /** Whether the campus polygon intersects the affected zones. */
+  campusInPolygon: boolean;
+  source: 'NWS' | 'NOAA' | 'state-emergency';
+  raw: string;                           // CAP message excerpt
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
+
+/** Runbook — a pre-approved sequence of steps. */
+export type RunbookCategory =
+  | 'severe-weather'
+  | 'active-threat'
+  | 'fire-evacuation'
+  | 'hazmat'
+  | 'cyber-incident'
+  | 'mass-medical'
+  | 'civil-unrest'
+  | 'utility-outage';
+
+export type RunbookStepKind =
+  | 'notify'           // dispatch a notification campaign
+  | 'lockdown'         // ACS lockdown initiation
+  | 'unlock'
+  | 'dispatch-unit'
+  | 'page-team'
+  | 'open-bridge-line'
+  | 'reroute-transit'
+  | 'isolate-utility'
+  | 'manual-check';
+
+export interface RunbookStep {
+  id: string;
+  order: number;
+  kind: RunbookStepKind;
+  title: string;
+  description: string;
+  /** ETA in seconds from runbook start. */
+  etaSec: number;
+  /** Whether this step can be auto-executed by the platform (vs human-only). */
+  automatable: boolean;
+}
+
+export interface Runbook {
+  id: string;                            // 'RBK-TORNADO-SHELTER-CENTRAL'
+  name: string;
+  category: RunbookCategory;
+  description: string;
+  ownerRole: RoleId;
+  steps: RunbookStep[];
+  /** Last time this runbook was reviewed for currency. */
+  lastReviewedAt: string;
+}
+
+export type RunbookExecutionStatus =
+  | 'queued'
+  | 'in-progress'
+  | 'paused'
+  | 'completed'
+  | 'aborted';
+
+export type RunbookStepStatus = 'pending' | 'in-progress' | 'completed' | 'skipped' | 'failed';
+
+export interface RunbookStepExecution {
+  stepId: string;
+  status: RunbookStepStatus;
+  startedAt?: string;
+  completedAt?: string;
+  resultNote?: string;
+}
+
+export interface RunbookExecution {
+  id: string;                            // 'RBX-2026-0042'
+  runbookId: string;
+  activationId?: string;
+  startedAt: string;
+  status: RunbookExecutionStatus;
+  steps: RunbookStepExecution[];
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
+
+// =========================================================================
+// §14 — Transportation (R6 partial — routes + GPS)
+// =========================================================================
+
+export type ShuttleRouteStatus = 'normal' | 'detour' | 'suspended';
+
+export interface ShuttleRoute {
+  id: string;                            // 'RTE-WEST-LOOP'
+  name: string;
+  status: ShuttleRouteStatus;
+  /** Ordered list of stop IDs (textual — full geometry deferred to R8). */
+  stops: string[];
+  /** Color hex for map rendering. */
+  color: string;
+  /** Coarse polyline points for the campus map. */
+  polyline: GeoPoint[];
+  /** Active vehicles assigned. */
+  activeVehicleCount: number;
+  /** Free text — note shown to riders during detour/suspension. */
+  riderNote?: string;
+}
+
+export interface TransitGPSPing {
+  id: string;
+  routeId: string;
+  vehicleId: string;
+  at: string;
+  location: GeoPoint;
+  speedMph: number;
+  headingDeg: number;
+  /** Whether the vehicle is on its expected route segment. */
+  onRoute: boolean;
+}
+
+// =========================================================================
+// §15 — Facilities / IoT (R6)
+// =========================================================================
+
+export type FirePanelEventKind =
+  | 'pre-alarm'
+  | 'alarm'
+  | 'trouble'
+  | 'supervisory'
+  | 'normal'
+  | 'test';
+
+export interface FirePanelEvent {
+  id: string;                            // 'FPE-2026-...'
+  buildingId: string;
+  panelId: string;
+  deviceLabel: string;                   // 'Pull-station 3W' or 'Smoke 4-C-12'
+  kind: FirePanelEventKind;
+  at: string;
+  acknowledgedAt?: string;
+  classification: Classification;
+}
+
+export type BMSAlarmKind =
+  | 'temp-high'
+  | 'temp-low'
+  | 'humidity-high'
+  | 'water-leak'
+  | 'door-prop'
+  | 'generator-start'
+  | 'generator-fail'
+  | 'ups-on-battery'
+  | 'hvac-fault'
+  | 'elevator-stuck';
+
+export type BMSAlarmSeverity = 'critical' | 'major' | 'minor' | 'info';
+
+export interface BMSAlarm {
+  id: string;                            // 'BMS-2026-...'
+  buildingId: string;
+  systemTag: string;                     // 'WW4-GEN-01' (generator) / 'AHU-3' / etc.
+  kind: BMSAlarmKind;
+  severity: BMSAlarmSeverity;
+  at: string;
+  acknowledgedAt?: string;
+  clearedAt?: string;
+  detail: string;
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
+
+export type GeneratorMode = 'normal' | 'test' | 'on-battery' | 'on-generator' | 'failed';
+
+export interface GeneratorState {
+  id: string;                            // 'GEN-WW4-01'
+  buildingId: string;
+  mode: GeneratorMode;
+  fuelLevelPct: number;                  // 0..100
+  /** Hours of runtime since last reset. */
+  runtimeHours: number;
+  lastTestAt: string;
+  /** ISO timestamp of last mode change. */
+  modeChangedAt: string;
+  /** Optional last failure summary. */
+  lastFaultDetail?: string;
+  classification: Classification;
+}
+
+export type EnvSensorKind = 'temp' | 'humidity' | 'co2' | 'water-level' | 'pressure' | 'wind';
+
+export interface EnvSensorReading {
+  id: string;
+  buildingId?: string;
+  sensorTag: string;
+  kind: EnvSensorKind;
+  at: string;
+  value: number;
+  unit: string;
+  thresholdLow?: number;
+  thresholdHigh?: number;
+  isAnomalous: boolean;
+}
+
+// §16 Compliance — still stubbed; lands in R7.
 
 // =========================================================================
 // §17 — Catalog / dataset / lineage / pipeline

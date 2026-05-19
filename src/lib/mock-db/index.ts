@@ -48,6 +48,21 @@ export { SANCTIONS, THREAD_A_SANCTIONS } from '../../../mocks/sanctions';
 export { EDU_PROGRAMS } from '../../../mocks/edu-programs';
 export { PARENTAL_NOTIFICATIONS, THREAD_A_PARENTAL_NOTIFICATIONS } from '../../../mocks/parental-notifications';
 export { INSIGHTS, THREAD_A_INSIGHTS } from '../../../mocks/insights';
+export { WEATHER_ALERTS, THREAD_B_WEATHER_ALERT } from '../../../mocks/weather-alerts';
+export {
+  EOC_ACTIVATIONS, SIT_LOG_ENTRIES, DECISION_LOG_ENTRIES, ICS_POSITIONS,
+  THREAD_B_ACTIVATION, THREAD_B_SIT_LOG, THREAD_B_DECISION_LOG,
+} from '../../../mocks/eoc-activations';
+export { RUNBOOKS, RUNBOOK_EXECUTIONS, THREAD_B_RUNBOOK_EXECUTION } from '../../../mocks/runbooks';
+export {
+  NOTIFICATION_CAMPAIGNS, THREAD_B_INITIAL_CAMPAIGN, THREAD_B_REDIRECT_CAMPAIGN,
+} from '../../../mocks/notification-campaigns';
+export { FIRE_PANEL_EVENTS, THREAD_B_FIRE_PRE_ALARM } from '../../../mocks/fire-panel-events';
+export { BMS_ALARMS, THREAD_B_GENERATOR_FAIL_ALARM } from '../../../mocks/bms-alarms';
+export { GENERATOR_STATE, THREAD_B_GENERATOR_STATE } from '../../../mocks/generator-state';
+export { ENV_SENSOR_READINGS } from '../../../mocks/env-sensors';
+export { SHUTTLE_ROUTES } from '../../../mocks/transit-routes';
+export { TRANSIT_GPS_PINGS } from '../../../mocks/transit-gps';
 
 // ----- imports for computed helpers ---------------------------------------
 import { BUILDINGS } from '../../../mocks/buildings';
@@ -84,6 +99,16 @@ import { SANCTIONS } from '../../../mocks/sanctions';
 import { EDU_PROGRAMS } from '../../../mocks/edu-programs';
 import { PARENTAL_NOTIFICATIONS } from '../../../mocks/parental-notifications';
 import { INSIGHTS } from '../../../mocks/insights';
+import { WEATHER_ALERTS } from '../../../mocks/weather-alerts';
+import { EOC_ACTIVATIONS, SIT_LOG_ENTRIES, DECISION_LOG_ENTRIES } from '../../../mocks/eoc-activations';
+import { RUNBOOKS, RUNBOOK_EXECUTIONS } from '../../../mocks/runbooks';
+import { NOTIFICATION_CAMPAIGNS } from '../../../mocks/notification-campaigns';
+import { FIRE_PANEL_EVENTS } from '../../../mocks/fire-panel-events';
+import { BMS_ALARMS } from '../../../mocks/bms-alarms';
+import { GENERATOR_STATE } from '../../../mocks/generator-state';
+import { ENV_SENSOR_READINGS } from '../../../mocks/env-sensors';
+import { SHUTTLE_ROUTES } from '../../../mocks/transit-routes';
+import { TRANSIT_GPS_PINGS } from '../../../mocks/transit-gps';
 import type {
   Building, ResidenceHall, Beat, Region, RegionId,
   Domain, DomainId,
@@ -103,6 +128,12 @@ import type {
   TitleIXCase,
   ConductCase, ConductSubtype, Sanction, EduProgram, ParentalNotification,
   Insight, InsightKind,
+  WeatherAlert,
+  EOCActivation, EOCActivationStatus, SitLogEntry, DecisionLogEntry,
+  Runbook, RunbookCategory, RunbookExecution,
+  NotificationCampaign, NotifCampaignStatus,
+  FirePanelEvent, BMSAlarm, GeneratorState, EnvSensorReading,
+  ShuttleRoute, TransitGPSPing,
 } from '@/lib/types';
 import type { DqRuleRow } from '../../../mocks/dq-rules';
 
@@ -725,6 +756,153 @@ export function insightsForAsset(assetId: string): Insight[] {
   return INSIGHTS.filter((i) => i.affectedAssets.includes(assetId));
 }
 
+// ====== Weather + EOC + Runbooks + Notifications + Facilities + Transit (R6) ==
+
+export function getWeatherAlert(id: string): WeatherAlert | undefined {
+  return WEATHER_ALERTS.find((a) => a.id === id);
+}
+
+export function activeWeatherAlerts(): WeatherAlert[] {
+  const now = Date.now();
+  return WEATHER_ALERTS.filter((a) => new Date(a.expiresAt).getTime() > now);
+}
+
+export function getEOCActivation(id: string): EOCActivation | undefined {
+  return EOC_ACTIVATIONS.find((a) => a.id === id);
+}
+
+export function activeEOCActivations(): EOCActivation[] {
+  return EOC_ACTIVATIONS.filter((a) => a.status === 'active');
+}
+
+export function eocActivationsByStatus(s: EOCActivationStatus): EOCActivation[] {
+  return EOC_ACTIVATIONS.filter((a) => a.status === s);
+}
+
+export function sitLogForActivation(activationId: string): SitLogEntry[] {
+  return SIT_LOG_ENTRIES
+    .filter((e) => e.activationId === activationId)
+    .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+}
+
+export function decisionLogForActivation(activationId: string): DecisionLogEntry[] {
+  return DECISION_LOG_ENTRIES
+    .filter((e) => e.activationId === activationId)
+    .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+}
+
+export function getRunbook(id: string): Runbook | undefined {
+  return RUNBOOKS.find((r) => r.id === id);
+}
+
+export function runbooksByCategory(c: RunbookCategory): Runbook[] {
+  return RUNBOOKS.filter((r) => r.category === c);
+}
+
+export function getRunbookExecution(id: string): RunbookExecution | undefined {
+  return RUNBOOK_EXECUTIONS.find((x) => x.id === id);
+}
+
+export function runbookExecutionsForActivation(activationId: string): RunbookExecution[] {
+  return RUNBOOK_EXECUTIONS.filter((x) => x.activationId === activationId);
+}
+
+export function getNotificationCampaign(id: string): NotificationCampaign | undefined {
+  return NOTIFICATION_CAMPAIGNS.find((c) => c.id === id);
+}
+
+export function notificationCampaignsByStatus(s: NotifCampaignStatus): NotificationCampaign[] {
+  return NOTIFICATION_CAMPAIGNS.filter((c) => c.status === s);
+}
+
+export function campaignsForActivation(activationId: string): NotificationCampaign[] {
+  return NOTIFICATION_CAMPAIGNS.filter((c) => c.triggeredByActivationId === activationId);
+}
+
+/** 30-day delivery rollup across all campaigns. */
+export function notificationDeliveryRollup30d(): {
+  totalSent: number;
+  totalDelivered: number;
+  totalFailed: number;
+  deliveryRate: number;
+  p50LatencySec: number;
+  p95LatencySec: number;
+} {
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const recent = NOTIFICATION_CAMPAIGNS.filter(
+    (c) => new Date(c.createdAt).getTime() >= cutoff,
+  );
+  let attempted = 0, delivered = 0, failed = 0;
+  const latP50: number[] = [];
+  const latP95: number[] = [];
+  for (const c of recent) {
+    for (const d of c.delivery) {
+      attempted += d.attempted;
+      delivered += d.delivered;
+      failed += d.failed;
+      latP50.push(d.latencyP50Sec);
+      latP95.push(d.latencyP95Sec);
+    }
+  }
+  const avg = (arr: number[]) => (arr.length === 0 ? 0 : arr.reduce((s, v) => s + v, 0) / arr.length);
+  return {
+    totalSent: attempted,
+    totalDelivered: delivered,
+    totalFailed: failed,
+    deliveryRate: attempted > 0 ? delivered / attempted : 0,
+    p50LatencySec: Math.round(avg(latP50)),
+    p95LatencySec: Math.round(avg(latP95)),
+  };
+}
+
+export function getFirePanelEvent(id: string): FirePanelEvent | undefined {
+  return FIRE_PANEL_EVENTS.find((e) => e.id === id);
+}
+
+export function firePanelEventsForBuilding(buildingId: string): FirePanelEvent[] {
+  return FIRE_PANEL_EVENTS.filter((e) => e.buildingId === buildingId);
+}
+
+export function getBMSAlarm(id: string): BMSAlarm | undefined {
+  return BMS_ALARMS.find((a) => a.id === id);
+}
+
+export function bmsAlarmsByBuilding(buildingId: string): BMSAlarm[] {
+  return BMS_ALARMS.filter((a) => a.buildingId === buildingId);
+}
+
+export function bmsAlarmsCritical(): BMSAlarm[] {
+  return BMS_ALARMS.filter((a) => a.severity === 'critical' && !a.clearedAt);
+}
+
+export function getGeneratorState(id: string): GeneratorState | undefined {
+  return GENERATOR_STATE.find((g) => g.id === id);
+}
+
+export function generatorsByMode(): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const g of GENERATOR_STATE) out[g.mode] = (out[g.mode] ?? 0) + 1;
+  return out;
+}
+
+export function envReadingsAnomalous(): EnvSensorReading[] {
+  return ENV_SENSOR_READINGS.filter((r) => r.isAnomalous);
+}
+
+export function getShuttleRoute(id: string): ShuttleRoute | undefined {
+  return SHUTTLE_ROUTES.find((r) => r.id === id);
+}
+
+export function shuttleRoutesByStatus(): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of SHUTTLE_ROUTES) out[r.status] = (out[r.status] ?? 0) + 1;
+  return out;
+}
+
+export function transitPingsForRoute(routeId: string): TransitGPSPing[] {
+  return TRANSIT_GPS_PINGS.filter((p) => p.routeId === routeId);
+}
+
 // ====== Cross-narrative integrity check ===================================
 
 import { THREAD_ANCHOR_REGISTRY } from '../../../mocks/threads';
@@ -758,6 +936,15 @@ function runIntegrityCheck() {
   }
   for (const id of THREAD_ANCHOR_REGISTRY.conductCases) {
     if (!getConductCase(id)) missing.push(`conduct-case: ${id}`);
+  }
+  for (const id of THREAD_ANCHOR_REGISTRY.weatherAlerts) {
+    if (!getWeatherAlert(id)) missing.push(`weather-alert: ${id}`);
+  }
+  for (const id of THREAD_ANCHOR_REGISTRY.eocActivations) {
+    if (!getEOCActivation(id)) missing.push(`eoc-activation: ${id}`);
+  }
+  for (const id of THREAD_ANCHOR_REGISTRY.notificationCampaigns) {
+    if (!getNotificationCampaign(id)) missing.push(`notification-campaign: ${id}`);
   }
   if (missing.length) {
     // eslint-disable-next-line no-console

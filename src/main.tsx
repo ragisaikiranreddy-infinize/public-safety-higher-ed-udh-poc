@@ -4,8 +4,7 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '@/components/layout/app-shell';
 import { RoleProvider } from '@/lib/role-context';
 
-// R0/R1/R2/R3/R4/R5 routes wired. Remaining phases land incrementally:
-//   R6 — Thread B (EOC)
+// R0–R6 routes wired. Remaining phases land incrementally:
 //   R7 — Thread C (Clery)
 //   R8 — Module 5B Conduct + Governance
 //   R9 — Polish, copilots, AI surfaces, demo script
@@ -36,6 +35,15 @@ import BITDetailPage from '@/routes/bit-detail';
 import TitleIXListPage from '@/routes/title-ix';
 import TitleIXDetailPage from '@/routes/title-ix-detail';
 import ConductDetailPage from '@/routes/conduct-detail';
+import EOCPage from '@/routes/eoc';
+import EOCDetailPage from '@/routes/eoc-detail';
+import RunbooksPage from '@/routes/runbooks';
+import RunbookRunPage from '@/routes/runbook-run';
+import NotificationsPage from '@/routes/notifications';
+import NotificationDetailPage from '@/routes/notification-detail';
+import LockdownsPage from '@/routes/lockdowns';
+import TransitPage from '@/routes/transit';
+import FacilitiesPage from '@/routes/facilities';
 import NotFoundPage from '@/routes/not-found';
 
 import './styles/globals.css';
@@ -79,6 +87,17 @@ const router = createBrowserRouter([
       { path: 'title-ix', element: <TitleIXListPage /> },
       { path: 'title-ix/:id', element: <TitleIXDetailPage /> },
       { path: 'conduct/:id', element: <ConductDetailPage /> },
+
+      // EOC + Runbooks + Notifications + Lockdowns + Transit + Facilities (R6)
+      { path: 'eoc', element: <EOCPage /> },
+      { path: 'eoc/activations/:id', element: <EOCDetailPage /> },
+      { path: 'runbooks', element: <RunbooksPage /> },
+      { path: 'runbooks/:id/run', element: <RunbookRunPage /> },
+      { path: 'notifications', element: <NotificationsPage /> },
+      { path: 'notifications/:id', element: <NotificationDetailPage /> },
+      { path: 'access/lockdowns', element: <LockdownsPage /> },
+      { path: 'transit', element: <TransitPage /> },
+      { path: 'facilities', element: <FacilitiesPage /> },
 
       { path: '*', element: <NotFoundPage /> },
     ],

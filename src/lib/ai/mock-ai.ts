@@ -10,8 +10,11 @@
  *   - summarizeBITSubject(personId)     → 7-bullet AI briefing with citations
  *   - bitCopilot(caseId, prompt)        → conversational copilot (canned)
  *
+ * R6 surface — Thread B (EOC):
+ *   - eocCopilot(activationId, prompt)  → operational copilot (canned)
+ *   - draftAAR(activationId)            → after-action report draft (canned)
+ *
  * Later phases extend:
- *   R6  — eocCopilot, draftAAR
  *   R7  — classifyCleryEvent, cleryCopilot
  *   R8  — conductCopilot, parentalNotifFerpaAid, hazingClassifier, amnestyAid
  *   R9  — askPlatform, cohortFromNL, buildDashboardFromNL
@@ -22,6 +25,10 @@ import {
   THREAD_A_SUBJECT_PERSON_ID,
   THREAD_A_BIT_CASE_ID,
   THREAD_A_BUILDING_OF_CONCERN_ID,
+  THREAD_B_EOC_ACTIVATION_ID,
+  THREAD_B_INITIAL_CAMPAIGN_ID,
+  THREAD_B_REDIRECT_CAMPAIGN_ID,
+  THREAD_B_FAILED_GENERATOR_BUILDING_ID,
 } from '../../../mocks/threads';
 import { evaluateBarrier } from '../information-barriers';
 
@@ -443,3 +450,205 @@ export function bitCopilot(
     citations: [],
   };
 }
+
+// =========================================================================
+// eocCopilot — Thread B operational copilot
+// =========================================================================
+
+export interface AIEocCopilotResult {
+  available: boolean;
+  reply: string;
+  citations: AICitation[];
+}
+
+/**
+ * Intent-router for EOC copilot prompts. Three canned intents tied to the
+ * Thread B activation:
+ *   - "status" / "sitrep"            → current state summary
+ *   - "generator" / "ww4"            → operational-intelligence detail
+ *   - "notification" / "campaign"    → campaign + delivery summary
+ */
+export function eocCopilot(
+  activationId: string,
+  prompt: string,
+  _actorRole: RoleId,
+): AIEocCopilotResult {
+  if (activationId !== THREAD_B_EOC_ACTIVATION_ID) {
+    return {
+      available: true,
+      reply:
+        'EOC copilot is enabled for the active Thread B activation in R6 (EOC-2026-013). The full corpus lands in R9.',
+      citations: [],
+    };
+  }
+
+  const q = prompt.toLowerCase().trim();
+
+  if (q.includes('status') || q.includes('sitrep') || q.includes('summary')) {
+    return {
+      available: true,
+      reply:
+        'Partial activation, 17 minutes in. Shelter campaign delivered to 14,210 recipients across 6 channels. ' +
+        'Four buildings locked down. Runbook on step 5/10 (BMS pre-check). WW4 generator failed 5 minutes ago — ' +
+        'redirect campaign already dispatched. ICS 207: 7/8 seats filled (Finance Chief unfilled).',
+      citations: [
+        {
+          kind: 'dataset',
+          refId: 'mart.notification_delivery_kpis',
+          label: 'mart.notification_delivery_kpis',
+          linkedRoute: '/catalog/mart.notification_delivery_kpis',
+          classification: 'public',
+        },
+      ],
+    };
+  }
+
+  if (q.includes('generator') || q.includes('ww4') || q.includes('west wing 4')) {
+    return {
+      available: true,
+      reply:
+        'WW4 generator (GEN-WW4-01) failed during transfer test with a fuel-pump pressure fault. Building is on UPS battery — ' +
+        '~23 minutes of runtime remaining. Facilities is on-scene; sister UPS-on-battery alarm fired simultaneously. ' +
+        'Redirect campaign MNP-2026-088-B sent to 412 occupants 3 minutes ago.',
+      citations: [
+        {
+          kind: 'dataset',
+          refId: 'facilities.alarms_normalized',
+          label: 'facilities.alarms_normalized',
+          linkedRoute: '/catalog/facilities.alarms_normalized',
+          classification: 'internal',
+        },
+      ],
+    };
+  }
+
+  if (q.includes('notification') || q.includes('campaign') || q.includes('alert')) {
+    return {
+      available: true,
+      reply:
+        'Two campaigns sent under this activation. MNP-2026-088 (initial shelter-in-place) reached 14,210 recipients with 99.1% SMS delivery and ' +
+        '83% email open rate. MNP-2026-088-B (WW4 redirect) reached 412 occupants with 99.0% SMS delivery and 96% push delivery. P95 SMS latency: 11s.',
+      citations: [
+        {
+          kind: 'dataset',
+          refId: 'notifications.delivery_normalized',
+          label: 'notifications.delivery_normalized',
+          linkedRoute: '/catalog/notifications.delivery_normalized',
+          classification: 'public',
+        },
+      ],
+    };
+  }
+
+  return {
+    available: true,
+    reply:
+      'I can speak to current status, the WW4 generator situation, or the mass-notification delivery rollup for this activation. What would you like to know?',
+    citations: [],
+  };
+}
+
+// =========================================================================
+// draftAAR — After-Action Report draft
+// =========================================================================
+
+export interface AIAARSection {
+  heading: string;
+  bullets: string[];
+}
+
+export interface AIAAR {
+  available: boolean;
+  activationId: string;
+  /** Executive headline rendered above the sections. */
+  headline: string;
+  sections: AIAARSection[];
+  /** Lessons-learned items with attribution. */
+  lessonsLearned: { observation: string; recommendation: string; ownerRole: RoleId }[];
+  /** Model attribution. */
+  model: { name: string; version: string; promptTokens: number; completionTokens: number };
+}
+
+export function draftAAR(activationId: string): AIAAR {
+  if (activationId !== THREAD_B_EOC_ACTIVATION_ID) {
+    return {
+      available: true,
+      activationId,
+      headline: 'No prior After-Action Report draft exists for this activation.',
+      sections: [],
+      lessonsLearned: [],
+      model: {
+        name: 'EOC-AARDrafter',
+        version: 'v0.2.1',
+        promptTokens: 380,
+        completionTokens: 26,
+      },
+    };
+  }
+
+  return {
+    available: true,
+    activationId,
+    headline:
+      'Partial activation for an NWS Tornado Warning. Shelter-in-place achieved campus-wide within 30 seconds; ' +
+      'four buildings lockdown-secured within 60s. Unforecast WW4 generator failure was detected at T+12 and ' +
+      'mitigated via a targeted redirect campaign at T+14.',
+    sections: [
+      {
+        heading: 'Timeline',
+        bullets: [
+          'T+0   — NWS Tornado Warning received; campus polygon intersection auto-detected.',
+          'T+30s — MNP-2026-088 dispatched (6 channels, 14,210 recipients).',
+          'T+60s — ACS lockdown initiated on 4 shelter-designated buildings.',
+          'T+90s — EOC team paged; 7/8 ICS 207 seats filled within 2 minutes.',
+          'T+12m — BMS alarm: WW4-GEN-01 failed during transfer test.',
+          'T+14m — Decision recorded: redirect WW4 occupants. MNP-2026-088-B dispatched.',
+        ],
+      },
+      {
+        heading: 'What worked',
+        bullets: [
+          'Auto-activation cascade from NWS feed eliminated the manual decision-to-action delay.',
+          'Multi-channel delivery achieved P95 < 11s on SMS — well within the 60-second target.',
+          'BMS-to-EOC correlation surfaced the WW4 generator failure within 90 seconds of occurrence.',
+        ],
+      },
+      {
+        heading: 'What did not work',
+        bullets: [
+          'Finance Section Chief seat remained unfilled at this activation level.',
+          'WW4 generator pre-test cadence (last test 13 days ago) did not catch the fuel-pump pressure fault.',
+          'Voice-channel delivery rate (94.5%) lagged SMS — recommend voice-tree review.',
+        ],
+      },
+    ],
+    lessonsLearned: [
+      {
+        observation: 'WW4 generator failure was not caught by the routine test cadence.',
+        recommendation: 'Tighten generator-test interval from 14d to 7d; add fuel-pump pressure to the automated test rubric.',
+        ownerRole: 'eoc-director',
+      },
+      {
+        observation: 'Finance Section Chief was unfilled when partial activation opened.',
+        recommendation: 'Add a secondary Finance Chief to the ICS 207 roster; alert if seat is unfilled within 5 minutes.',
+        ownerRole: 'eoc-director',
+      },
+      {
+        observation: 'Voice-channel P95 latency reached 41 seconds.',
+        recommendation: 'Review TTS provider SLA and voice-tree depth. Consider parallel-call ramping.',
+        ownerRole: 'ciso',
+      },
+    ],
+    model: {
+      name: 'EOC-AARDrafter',
+      version: 'v0.2.1',
+      promptTokens: 2104,
+      completionTokens: 484,
+    },
+  };
+}
+
+// Pin Thread B campaign + building imports for unused-import lint.
+void THREAD_B_INITIAL_CAMPAIGN_ID;
+void THREAD_B_REDIRECT_CAMPAIGN_ID;
+void THREAD_B_FAILED_GENERATOR_BUILDING_ID;

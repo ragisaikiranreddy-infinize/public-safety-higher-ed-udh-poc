@@ -397,7 +397,7 @@ export function bitCopilot(
   if (caseId !== THREAD_A_BIT_CASE_ID) {
     return {
       available: true,
-      reply: 'Conversational copilot is enabled for a single demo case in R5 (BIT-2026-0067). The full corpus lands in R9.',
+      reply: 'The conversational copilot is wired to the canonical demo case (BIT-2026-0067) for this POC. Open that case to exercise the full Q&A flow.',
       citations: [],
     };
   }
@@ -493,7 +493,7 @@ export function eocCopilot(
     return {
       available: true,
       reply:
-        'EOC copilot is enabled for the active Thread B activation in R6 (EOC-2026-013). The full corpus lands in R9.',
+        'The EOC copilot is wired to the active Thread B activation (EOC-2026-013) for this POC. Open that activation to exercise the full Q&A flow.',
       citations: [],
     };
   }

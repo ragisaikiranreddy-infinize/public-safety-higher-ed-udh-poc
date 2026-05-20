@@ -38,7 +38,7 @@ export default function QualityPage() {
       <PageHeader
         eyebrow="Data · Quality Console"
         title="Six-dimension Data Quality"
-        description={`${DQ_RULES.length} rules across the six DQ dimensions. ${failing.length} failing today. Failing rules surface first; quarantine workflow lands in R2.`}
+        description={`${DQ_RULES.length} rules across the six DQ dimensions. ${failing.length} failing today — failing rules surface first.`}
       />
 
       <div className="space-y-6 px-8 py-6">

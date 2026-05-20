@@ -1,8 +1,8 @@
 /**
  * /access/lockdowns — ACS lockdown state board.
  *
- * R6 ships a thin board reading off the active EOC activation's lockdownIds.
- * The full lockdown lifecycle / staged-release UX lands in R8.
+ * Reads off each active EOC activation's lockdownIds and renders a row per
+ * building. Staged-release UX (per-zone reopen) is out-of-scope for the POC.
  */
 import { Link } from 'react-router-dom';
 import { Lock } from 'lucide-react';
@@ -35,7 +35,7 @@ export default function LockdownsPage() {
       <PageHeader
         eyebrow="Surveillance · Access Control · Lockdowns"
         title="Lockdown state"
-        description={`${lockdownRows.length} active lockdown(s). Active under ${active.length} EOC activation(s). Staged-release flow lands in R8.`}
+        description={`${lockdownRows.length} active lockdown(s) across ${active.length} EOC activation(s).`}
       />
 
       <div className="space-y-6 px-8 py-6">

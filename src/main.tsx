@@ -21,6 +21,10 @@ import PersonsPage from '@/routes/persons';
 import PersonDetailPage from '@/routes/person-detail';
 import IncidentsPage from '@/routes/incidents';
 import IncidentDetailPage from '@/routes/incident-detail';
+import CasesPage from '@/routes/cases';
+import CaseDetailPage from '@/routes/case-detail';
+import VehiclesPage from '@/routes/vehicles';
+import VehicleDetailPage from '@/routes/vehicle-detail';
 import CamerasPage from '@/routes/cameras';
 import CameraDetailPage from '@/routes/camera-detail';
 import AccessPage from '@/routes/access';
@@ -93,6 +97,10 @@ const router = createBrowserRouter([
       // Incidents (R3)
       { path: 'incidents', element: <IncidentsPage /> },
       { path: 'incidents/:id', element: <IncidentDetailPage /> },
+      { path: 'cases', element: <CasesPage /> },
+      { path: 'cases/:id', element: <CaseDetailPage /> },
+      { path: 'vehicles', element: <VehiclesPage /> },
+      { path: 'vehicles/:id', element: <VehicleDetailPage /> },
 
       // People (R3)
       { path: 'persons', element: <PersonsPage /> },

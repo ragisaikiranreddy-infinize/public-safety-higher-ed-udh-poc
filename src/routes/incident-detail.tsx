@@ -6,7 +6,7 @@
  *   Timeline     — received → dispatched → enroute → on-scene → cleared
  *   Units lane   — units assigned + primary officer
  *   People panel — reporter / involved persons (role-masked)
- *   Geofence     — location, building, Clery class, related cameras/doors (R4 placeholder)
+ *   Geofence     — location, building, Clery class, related cameras/doors
  *   NIBRS + ASR  — NIBRS codes, Clery reportability, ASR line linkage
  */
 import { useParams, Link } from 'react-router-dom';
@@ -123,9 +123,9 @@ export default function IncidentDetailPage() {
                 </div>
               )}
               <div className="mt-3 grid grid-cols-1 gap-1.5">
-                <RelatedRow icon={Camera} label="Related cameras" count={incident.relatedCameraIds.length} placeholder="R4" />
-                <RelatedRow icon={DoorOpen} label="Related door events" count={incident.relatedDoorEventIds.length} placeholder="R4" />
-                <RelatedRow icon={Bell} label="Notification campaigns" count={incident.relatedCampaignIds.length} placeholder="R6" />
+                <RelatedRow icon={Camera} label="Related cameras" count={incident.relatedCameraIds.length} />
+                <RelatedRow icon={DoorOpen} label="Related door events" count={incident.relatedDoorEventIds.length} />
+                <RelatedRow icon={Bell} label="Notification campaigns" count={incident.relatedCampaignIds.length} />
               </div>
               <Separator className="my-2" />
               <div>
@@ -263,14 +263,12 @@ function KpiBox({ label, value, mono }: { label: string; value: string; mono?: b
   );
 }
 
-function RelatedRow({ icon: Icon, label, count, placeholder }: { icon: React.ElementType; label: string; count: number; placeholder?: string }) {
+function RelatedRow({ icon: Icon, label, count }: { icon: React.ElementType; label: string; count: number }) {
   return (
     <div className="flex items-center gap-2 text-[11px]">
       <Icon className="h-3.5 w-3.5 text-[var(--graphite-500)]" />
       <span className="flex-1 text-[var(--muted-foreground)]">{label}</span>
-      <span className="tabular-nums text-[var(--foreground)]">
-        {count} {placeholder && count === 0 && <span className="text-[9px] text-[var(--muted-foreground)]">({placeholder})</span>}
-      </span>
+      <span className="tabular-nums text-[var(--foreground)]">{count}</span>
     </div>
   );
 }

@@ -32,8 +32,16 @@ const cleryDash: Dashboard = {
     widget('w2', 'kpi', 'Timely Warnings issued (12mo)', 3, 180, { value: '5', hint: 'avg 39m to issue', datasetId: 'mart.timely_warning_decisions' }),
     widget('w3', 'kpi', 'FOIA open requests', 3, 360, { value: '11', hint: '1 past due', datasetId: 'foia.requests_normalized' }),
     widget('w4', 'kpi', 'NIBRS last submission', 3, 540, { value: 'accepted', hint: 'M-03-2026', datasetId: 'nibris.export_history_raw' }),
-    widget('w5', 'bar-chart', 'ASR cells by status', 8, 720, { hint: 'reviewed · awaiting · open · submitted', sparkline: [58, 4, 12, 6] }),
-    widget('w6', 'donut', 'Clery geography mix', 4, 900, { hint: '36 on-campus · 8 residential · 1 non-campus · 3 public', sparkline: [36, 8, 1, 3] }),
+    widget('w5', 'bar-chart', 'ASR cells by status', 8, 720, {
+      hint: 'reviewed · awaiting · open · submitted',
+      sparkline: [58, 4, 12, 6],
+      labels: ['reviewed', 'awaiting', 'open', 'submitted'],
+    }),
+    widget('w6', 'donut', 'Clery geography mix', 4, 900, {
+      hint: 'on-campus · residential · non-campus · public',
+      sparkline: [36, 8, 1, 3],
+      labels: ['on-campus', 'residential', 'non-campus', 'public'],
+    }),
   ],
   classification: 'public',
 };
@@ -52,7 +60,12 @@ const eocDash: Dashboard = {
     widget('w3', 'kpi', 'Notifications delivery (30d)', 3, 360, { value: '96.4%', hint: 'P95 11s SMS' }),
     widget('w4', 'kpi', 'Generators not normal', 3, 540, { value: '1', hint: '1 failed (WW4)' }),
     widget('w5', 'line-chart', 'Campaigns sent (90d)', 6, 720, { sparkline: [3, 1, 0, 2, 4, 1, 0, 1, 2, 3, 1, 2, 0, 1, 4, 2, 1, 0, 2, 1, 3, 1, 0, 2, 4, 1, 0, 1, 2, 3] }),
-    widget('w6', 'table', 'Open activations table', 6, 900, { hint: '1 row · EOC-2026-013 / partial / 17m elapsed' }),
+    widget('w6', 'table', 'Open activations', 6, 900, {
+      tableRows: [
+        ['Activation', 'Level', 'Elapsed', 'Trigger'],
+        ['EOC-2026-013', 'partial', '17m', 'tornado warning'],
+      ],
+    }),
   ],
   classification: 'internal',
 };
@@ -70,8 +83,14 @@ const bitDash: Dashboard = {
     widget('w2', 'kpi', 'Critical + elevated', 3, 180, { value: '5', hint: '1 critical · 4 elevated' }),
     widget('w3', 'kpi', 'Reviews due this week', 3, 360, { value: '7', hint: 'BIT-2026-0067 included' }),
     widget('w4', 'kpi', 'Tier changes (7d)', 3, 540, { value: '4', hint: 'rising + falling' }),
-    widget('w5', 'donut', 'Cases by NaBITA tier', 4, 720, { sparkline: [1, 4, 10, 8] }),
-    widget('w6', 'insight-feed', 'Recent Thread A insights', 8, 900, { hint: '3 RCA / prediction / anomaly insights' }),
+    widget('w5', 'donut', 'Cases by NaBITA tier', 4, 720, {
+      sparkline: [1, 4, 10, 8],
+      labels: ['critical', 'elevated', 'moderate', 'low'],
+    }),
+    widget('w6', 'insight-feed', 'Recent Thread A insights', 8, 900, {
+      threadTag: 'A',
+      hint: 'RCA · prediction · anomaly — Thread A only',
+    }),
   ],
   classification: 'ferpa-edu-record',
 };
@@ -89,7 +108,10 @@ const ceoDash: Dashboard = {
     widget('w3', 'kpi', 'Clery audit posture', 3, 360, { value: 'green', hint: '73% ASR completeness' }),
     widget('w4', 'kpi', 'Active EOC activations', 3, 540, { value: '1', hint: 'partial level' }),
     widget('w5', 'line-chart', 'Incidents per day (90d)', 8, 720, { sparkline: [4, 6, 5, 8, 7, 4, 5, 9, 8, 6, 7, 5, 4, 8, 9, 7, 6, 5, 4, 8, 7, 6, 5, 9, 8, 7, 6, 5, 8, 7] }),
-    widget('w6', 'donut', 'By call-type family', 4, 900, { sparkline: [120, 80, 60, 90, 40] }),
+    widget('w6', 'donut', 'By call-type family', 4, 900, {
+      sparkline: [120, 80, 60, 90, 40],
+      labels: ['welfare', 'access', 'theft', 'medical', 'other'],
+    }),
   ],
   classification: 'public',
 };

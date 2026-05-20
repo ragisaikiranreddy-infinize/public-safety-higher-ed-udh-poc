@@ -26,6 +26,7 @@ import {
   CONDUCT_CASES,
   RUNBOOK_EXECUTIONS,
   NOTIFICATION_CAMPAIGNS,
+  CSA_REPORTS,
   shelterDesignatedBuildings,
   totalResidentialOccupancy,
   totalResidentialCapacity,
@@ -40,6 +41,11 @@ import {
   generatorsByMode,
   notificationDeliveryRollup30d,
   cleryReportableCount,
+  asrCompleteness,
+  timelyWarningCounts,
+  biasIncidentsHateCrimeThresholdMet,
+  policiesDueForReview,
+  THREAD_C_ASR_YEAR,
 } from '@/lib/mock-db';
 import { getBarrierHits } from '@/lib/information-barriers';
 import { currentSemester, currentShift, ANCHOR, hoursAgo } from '@/lib/time';
@@ -256,7 +262,7 @@ const KPI_LIBRARY: Record<string, KpiSpec> = {
     icon: Sparkles,
     compute: () => {
       const n = openConductCasesCount();
-      return { value: `${n}`, hint: 'substance + residential (R5)' };
+      return { value: `${n}`, hint: 'substance + residential subtypes', href: '/conduct' };
     },
   },
   'substance-pattern-alerts': {
@@ -323,7 +329,14 @@ const KPI_LIBRARY: Record<string, KpiSpec> = {
     id: 'annual-stats',
     label: 'Annual stats (Clery)',
     icon: ShieldCheck,
-    compute: () => ({ value: '—', hint: 'ASR workbench lands in R7' }),
+    compute: () => {
+      const c = asrCompleteness(THREAD_C_ASR_YEAR);
+      return {
+        value: `${Math.round(c.pct * 100)}%`,
+        hint: `${c.reviewed} / ${c.total} ASR cells reviewed (${THREAD_C_ASR_YEAR})`,
+        href: `/clery/asr/${THREAD_C_ASR_YEAR}`,
+      };
+    },
   },
 
   // ---------- Governance / Trust (CISO) ----------
@@ -333,7 +346,7 @@ const KPI_LIBRARY: Record<string, KpiSpec> = {
     icon: ShieldCheck,
     compute: () => {
       const n = getBarrierHits().length;
-      return { value: `${n}`, hint: 'logged this session — see /audit (R8)' };
+      return { value: `${n}`, hint: 'logged this session — see /audit', href: '/audit' };
     },
   },
   'barrier-hits-today': {
@@ -374,9 +387,17 @@ const KPI_LIBRARY: Record<string, KpiSpec> = {
   },
   'dr-posture': {
     id: 'dr-posture',
-    label: 'DR posture',
+    label: 'Policies due (60d)',
     icon: ShieldCheck,
-    compute: () => ({ value: '—', hint: 'governance panel lands in R8' }),
+    compute: () => {
+      const n = policiesDueForReview(60).length;
+      return {
+        value: `${n}`,
+        hint: 'next review due within 60 days',
+        href: '/policies',
+        tone: n > 5 ? 'warning' : 'good',
+      };
+    },
   },
 
   // ---------- Executive (aggregate) ----------
@@ -399,13 +420,28 @@ const KPI_LIBRARY: Record<string, KpiSpec> = {
     id: 'clery-audit-posture',
     label: 'Clery — reportable (12mo)',
     icon: ShieldCheck,
-    compute: () => ({ value: `${cleryReportableCount()}`, hint: 'Clery-reportable incidents (full audit in R7)' }),
+    compute: () => ({ value: `${cleryReportableCount()}`, hint: 'Clery-reportable incidents', href: '/clery' }),
   },
   'campus-safety-score': {
     id: 'campus-safety-score',
     label: 'Campus safety score',
     icon: ShieldCheck,
-    compute: () => ({ value: '—', hint: 'composite score lands in R9' }),
+    compute: () => {
+      const criticalBit = BIT_CASES.filter((c) => c.riskTier === 'critical' && c.status !== 'closed').length;
+      const eocs = activeEOCActivations();
+      const fullEoc = eocs.filter((a) => a.level === 'full').length;
+      const partialEoc = eocs.filter((a) => a.level === 'partial').length;
+      const p1Open = INCIDENTS.filter(
+        (i) => i.priority === 1 && (i.status === 'open' || i.status === 'pending'),
+      ).length;
+      const score = Math.max(0, 100 - criticalBit * 2 - fullEoc * 5 - partialEoc * 3 - p1Open);
+      const tone: 'critical' | 'warning' | 'good' = score < 60 ? 'critical' : score < 80 ? 'warning' : 'good';
+      return {
+        value: `${score}`,
+        hint: `composite — ${criticalBit} crit BIT · ${fullEoc + partialEoc} EOC · ${p1Open} open p1`,
+        tone,
+      };
+    },
   },
 
   // ---------- Compliance (Clery officer) — R7 ----------
@@ -413,25 +449,61 @@ const KPI_LIBRARY: Record<string, KpiSpec> = {
     id: 'asr-completeness',
     label: 'ASR build completeness',
     icon: ShieldCheck,
-    compute: () => ({ value: '—', hint: 'ASR workbench lands in R7' }),
+    compute: () => {
+      const c = asrCompleteness(THREAD_C_ASR_YEAR);
+      const pct = Math.round(c.pct * 100);
+      return {
+        value: `${pct}%`,
+        hint: `${c.reviewed} / ${c.total} cells reviewed`,
+        href: `/clery/asr/${THREAD_C_ASR_YEAR}`,
+        tone: pct < 50 ? 'warning' : 'good',
+      };
+    },
   },
   'timely-warnings': {
     id: 'timely-warnings',
-    label: 'Timely Warnings (week)',
+    label: 'Timely Warnings (12mo)',
     icon: ShieldCheck,
-    compute: () => ({ value: '—', hint: 'Timely Warning ledger lands in R7' }),
+    compute: () => {
+      const c = timelyWarningCounts();
+      return {
+        value: `${c.issued}`,
+        hint:
+          c.avgMinutesToIssue !== null
+            ? `avg ${c.avgMinutesToIssue}m to issue · ${c.pending} pending`
+            : `${c.pending} pending · ${c.declined} declined`,
+        href: '/clery',
+        tone: c.pending > 0 ? 'warning' : 'good',
+      };
+    },
   },
   'csa-outstanding': {
     id: 'csa-outstanding',
-    label: 'CSA reports outstanding',
+    label: 'CSA reports — pending ASR',
     icon: ShieldCheck,
-    compute: () => ({ value: '—', hint: 'CSA register lands in R7' }),
+    compute: () => {
+      const outstanding = CSA_REPORTS.filter((r) => !r.asrInclusion).length;
+      return {
+        value: `${outstanding}`,
+        hint: `${outstanding} / ${CSA_REPORTS.length} CSA disclosures not yet ASR-included`,
+        href: '/clery',
+        tone: outstanding > 0 ? 'warning' : 'good',
+      };
+    },
   },
   'hate-crime-review': {
     id: 'hate-crime-review',
     label: 'Hate-crime review queue',
     icon: ShieldCheck,
-    compute: () => ({ value: '—', hint: 'Bias review queue lands in R7' }),
+    compute: () => {
+      const n = biasIncidentsHateCrimeThresholdMet().length;
+      return {
+        value: `${n}`,
+        hint: 'bias incidents meeting hate-crime threshold',
+        href: '/bias',
+        tone: n > 0 ? 'warning' : 'good',
+      };
+    },
   },
 };
 

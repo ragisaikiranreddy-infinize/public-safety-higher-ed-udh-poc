@@ -66,7 +66,6 @@ const SECTIONS: NavSection[] = [
     items: [
       { to: '/incidents', label: 'Incidents', icon: Siren },
       { to: '/cases', label: 'Cases', icon: ClipboardList },
-      { to: '/calls', label: 'Calls for Service', icon: Radio },
     ],
   },
   {

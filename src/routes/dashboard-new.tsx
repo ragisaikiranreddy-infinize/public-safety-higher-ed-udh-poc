@@ -59,7 +59,7 @@ export default function DashboardNewPage() {
               {SAMPLE_PROMPTS.map((p) => (
                 <button
                   key={p}
-                  onClick={() => { setPrompt(p); run(p); }}
+                  onClick={() => setPrompt(p)}
                   className="rounded-md border bg-[var(--card)] px-3 py-1.5 text-xs hover:bg-[var(--graphite-50)]"
                 >
                   {p}

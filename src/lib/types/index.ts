@@ -2098,10 +2098,16 @@ export interface DashboardWidget {
   value?: string;
   /** Synthesized 30-day sparkline points. */
   sparkline?: number[];
+  /** Parallel-indexed category labels for donut / bar-chart segments. */
+  labels?: string[];
   /** Short caption / hint. */
   hint?: string;
   /** Stagger delay in ms when the dashboard reveals. */
   staggerMs: number;
+  /** Optional thread filter for insight-feed widgets. */
+  threadTag?: ThreadTag;
+  /** Optional explicit rows for table widgets (header row first). */
+  tableRows?: string[][];
 }
 
 export interface Dashboard {

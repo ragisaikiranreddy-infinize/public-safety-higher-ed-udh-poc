@@ -2035,7 +2035,182 @@ export interface Insight {
 }
 
 // =========================================================================
-// §20 — Dashboard & conversational (R5+); §21 Governance (R8). Stubbed.
+// §20 — Dashboard & conversational (R9 — Ask, Cohorts, Dashboards, Actions)
+// =========================================================================
+
+// ----- Cohorts (NL builder) -----------------------------------------------
+
+/** Cohort = a saved set of entities matched by a predicate stack. */
+export type CohortEntityKind = 'person' | 'incident' | 'building' | 'bit-case' | 'officer';
+
+/** A predicate "chip" in the NL→cohort pipeline. */
+export interface CohortChip {
+  id: string;
+  /** Free-text label rendered on the chip (e.g. "after-hours swipes"). */
+  label: string;
+  /** Predicate kind — determines the operator. */
+  kind: 'filter' | 'aggregate' | 'window' | 'threshold';
+  /** Field being filtered (e.g. 'access.events.isAfterHours'). */
+  field?: string;
+  /** Operator. */
+  op?: '=' | '!=' | '>' | '<' | '>=' | '<=' | 'in' | 'within';
+  /** Value(s) — encoded as JSON-ish primitives. */
+  value?: string | number | boolean | string[];
+}
+
+export interface Cohort {
+  id: string;                       // 'CHT-2026-...'
+  name: string;
+  entityKind: CohortEntityKind;
+  chips: CohortChip[];
+  /** Resolved entity IDs. */
+  memberIds: string[];
+  ownerRole: RoleId;
+  createdAt: string;
+  lastRefreshedAt: string;
+  /** Underlying datasets the cohort reads from. */
+  evidenceDatasetIds: string[];
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
+
+// ----- Dashboards (AI builder) -------------------------------------------
+
+export type DashboardWidgetKind =
+  | 'kpi'
+  | 'line-chart'
+  | 'bar-chart'
+  | 'donut'
+  | 'table'
+  | 'map'
+  | 'insight-feed'
+  | 'cohort-summary';
+
+export interface DashboardWidget {
+  id: string;
+  kind: DashboardWidgetKind;
+  title: string;
+  /** Span — grid columns out of 12. */
+  span: 3 | 4 | 6 | 8 | 12;
+  /** Source dataset (or null for synthesized). */
+  datasetId?: string;
+  /** Synthesized numeric value (for KPI). */
+  value?: string;
+  /** Synthesized 30-day sparkline points. */
+  sparkline?: number[];
+  /** Short caption / hint. */
+  hint?: string;
+  /** Stagger delay in ms when the dashboard reveals. */
+  staggerMs: number;
+}
+
+export interface Dashboard {
+  id: string;                       // 'DSH-2026-...'
+  name: string;
+  description: string;
+  ownerRole: RoleId;
+  /** NL prompt the dashboard was built from (when AI-generated). */
+  promptSource?: string;
+  widgets: DashboardWidget[];
+  createdAt: string;
+  isPinned: boolean;
+  classification: Classification;
+}
+
+// ----- Actions / watchpoints (saved alerts + scheduled reports) -----------
+
+export type ActionKind =
+  | 'watchpoint'
+  | 'scheduled-report'
+  | 'saved-cohort'
+  | 'pinned-dashboard'
+  | 'bookmark';
+
+export type ActionCadence = 'realtime' | 'hourly' | 'daily' | 'weekly' | 'monthly';
+
+export type ActionStatus = 'active' | 'paused' | 'expired';
+
+export interface SavedAction {
+  id: string;                       // 'ACT-2026-...'
+  kind: ActionKind;
+  name: string;
+  description: string;
+  ownerRole: RoleId;
+  cadence: ActionCadence;
+  status: ActionStatus;
+  /** Last-fired timestamp (for watchpoints + scheduled reports). */
+  lastFiredAt?: string;
+  /** Free-text condition expression. */
+  condition?: string;
+  /** Optional cohort / dashboard reference. */
+  targetId?: string;
+  createdAt: string;
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
+
+// ----- Copilot directory --------------------------------------------------
+
+export interface CopilotEntry {
+  id: string;                       // 'CPLT-BIT'
+  name: string;
+  scope: 'BIT' | 'EOC' | 'Clery' | 'Conduct' | 'Platform';
+  description: string;
+  /** Route the copilot lives on. */
+  route: string;
+  /** Whether the copilot is enabled for the current persona. */
+  ownerRoles: RoleId[];
+  /** Last interaction timestamp (for the directory). */
+  lastUsedAt?: string;
+}
+
+// ----- Notifications panel ------------------------------------------------
+
+export type NotificationKind =
+  | 'anonymous-tip'
+  | 'barrier-hit'
+  | 'pipeline-failure'
+  | 'bit-tier-change'
+  | 'eoc-activation'
+  | 'foia-due'
+  | 'sanction-overdue';
+
+export interface PlatformNotification {
+  id: string;                       // 'NTF-2026-...'
+  kind: NotificationKind;
+  at: string;
+  title: string;
+  body: string;
+  /** Deep-link route. */
+  linkedRoute?: string;
+  /** Marked unread by the user. */
+  unread: boolean;
+  classification: Classification;
+  threadTag?: ThreadTag;
+}
+
+// ----- Officer extensions (Officer 360 + workforce + bias audit) ----------
+
+export interface OfficerStats {
+  officerId: string;
+  /** Active assignments (open incidents primary on). */
+  openIncidentCount: number;
+  /** YTD incident count primary on. */
+  ytdIncidentCount: number;
+  /** Average response time minutes — past 90 days, priority 1/2. */
+  avgResponseTimeMin: number | null;
+  /** Use-of-force reports filed YTD. */
+  useOfForceCount: number;
+  /** Commendations YTD. */
+  commendationCount: number;
+  /** Complaints filed against — past 12 months. */
+  complaintCount: number;
+  /** Hours of training completed YTD. */
+  trainingHoursYTD: number;
+  /** Bias-audit posture (0..100, higher = better). */
+  biasAuditScore: number;
+}
+
 // =========================================================================
 
 // =========================================================================

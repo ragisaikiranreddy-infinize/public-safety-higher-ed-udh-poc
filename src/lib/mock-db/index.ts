@@ -80,6 +80,12 @@ export { ACADEMIC_INTEGRITY_CASES } from '../../../mocks/academic-integrity';
 export { POLICIES } from '../../../mocks/policies';
 export { REGULATIONS } from '../../../mocks/regulations';
 export { PLATFORM_ACCESS_LOG } from '../../../mocks/access-log';
+export { COHORTS, THREAD_A_COHORT } from '../../../mocks/cohorts';
+export { DASHBOARDS } from '../../../mocks/dashboards';
+export { SAVED_ACTIONS } from '../../../mocks/watchpoints';
+export { COPILOTS } from '../../../mocks/copilots';
+export { NOTIFICATIONS, LIVE_PING_NOTIFICATION } from '../../../mocks/notifications';
+export { OFFICER_STATS } from '../../../mocks/officer-stats';
 
 // ----- imports for computed helpers ---------------------------------------
 import { BUILDINGS } from '../../../mocks/buildings';
@@ -141,6 +147,12 @@ import { ACADEMIC_INTEGRITY_CASES } from '../../../mocks/academic-integrity';
 import { POLICIES } from '../../../mocks/policies';
 import { REGULATIONS } from '../../../mocks/regulations';
 import { PLATFORM_ACCESS_LOG } from '../../../mocks/access-log';
+import { COHORTS } from '../../../mocks/cohorts';
+import { DASHBOARDS } from '../../../mocks/dashboards';
+import { SAVED_ACTIONS } from '../../../mocks/watchpoints';
+import { COPILOTS } from '../../../mocks/copilots';
+import { NOTIFICATIONS } from '../../../mocks/notifications';
+import { OFFICER_STATS } from '../../../mocks/officer-stats';
 import type {
   Building, ResidenceHall, Beat, Region, RegionId,
   Domain, DomainId,
@@ -171,6 +183,8 @@ import type {
   ConductCharge, MissingStudentReport, BiasIncident,
   OrganizationalConductCase, CITDispatchFlag, AcademicIntegrityCase,
   Policy, PolicyCategory, Regulation, RegulationId, PlatformAccessLogEntry,
+  Cohort, Dashboard, SavedAction, ActionKind, CopilotEntry, OfficerStats,
+  PlatformNotification,
 } from '@/lib/types';
 import type { DqRuleRow } from '../../../mocks/dq-rules';
 
@@ -1127,6 +1141,72 @@ export function accessLogByActionKind(): Record<string, number> {
   const out: Record<string, number> = {};
   for (const e of PLATFORM_ACCESS_LOG) out[e.action] = (out[e.action] ?? 0) + 1;
   return out;
+}
+
+// ====== AI surfaces + Officer 360 + Notifications (R9) ====================
+
+export function getCohort(id: string): Cohort | undefined {
+  return COHORTS.find((c) => c.id === id);
+}
+
+export function getDashboard(id: string): Dashboard | undefined {
+  return DASHBOARDS.find((d) => d.id === id);
+}
+
+export function dashboardsPinned(): Dashboard[] {
+  return DASHBOARDS.filter((d) => d.isPinned);
+}
+
+export function getSavedAction(id: string): SavedAction | undefined {
+  return SAVED_ACTIONS.find((a) => a.id === id);
+}
+
+export function savedActionsByKind(kind: ActionKind): SavedAction[] {
+  return SAVED_ACTIONS.filter((a) => a.kind === kind);
+}
+
+export function savedActionsActive(): SavedAction[] {
+  return SAVED_ACTIONS.filter((a) => a.status === 'active');
+}
+
+export function getCopilot(id: string): CopilotEntry | undefined {
+  return COPILOTS.find((c) => c.id === id);
+}
+
+export function getOfficerStats(officerId: string): OfficerStats | undefined {
+  return OFFICER_STATS.find((s) => s.officerId === officerId);
+}
+
+export function workforceTotals(): {
+  officers: number;
+  citTrained: number;
+  totalYTDIncidents: number;
+  totalUseOfForce: number;
+  totalComplaints: number;
+  totalCommendations: number;
+  avgBiasAuditScore: number;
+} {
+  const cit = OFFICERS.filter((o) => o.isCitTrained).length;
+  const ytdIncidents = OFFICER_STATS.reduce((s, x) => s + x.ytdIncidentCount, 0);
+  const useOfForce = OFFICER_STATS.reduce((s, x) => s + x.useOfForceCount, 0);
+  const complaints = OFFICER_STATS.reduce((s, x) => s + x.complaintCount, 0);
+  const commendations = OFFICER_STATS.reduce((s, x) => s + x.commendationCount, 0);
+  const avgBias = OFFICER_STATS.length === 0
+    ? 0
+    : Math.round(OFFICER_STATS.reduce((s, x) => s + x.biasAuditScore, 0) / OFFICER_STATS.length);
+  return {
+    officers: OFFICERS.length,
+    citTrained: cit,
+    totalYTDIncidents: ytdIncidents,
+    totalUseOfForce: useOfForce,
+    totalComplaints: complaints,
+    totalCommendations: commendations,
+    avgBiasAuditScore: avgBias,
+  };
+}
+
+export function notificationsUnread(): PlatformNotification[] {
+  return NOTIFICATIONS.filter((n) => n.unread);
 }
 
 // ====== Cross-narrative integrity check ===================================

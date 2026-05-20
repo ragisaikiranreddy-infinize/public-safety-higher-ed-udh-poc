@@ -4,10 +4,7 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '@/components/layout/app-shell';
 import { RoleProvider } from '@/lib/role-context';
 
-// R0–R8 routes wired. Remaining phases land incrementally:
-//   R9 — Polish, copilots, AI surfaces, demo script
-//
-// Until each phase lands, those URLs render the NotFoundPage (404-friendly).
+// R0–R9 routes wired. R10 is production deploy only.
 
 import HomePage from '@/routes/home';
 import CatalogPage from '@/routes/catalog';
@@ -57,6 +54,19 @@ import GovernancePage from '@/routes/governance';
 import AuditPage from '@/routes/audit';
 import PoliciesPage from '@/routes/policies';
 import RegulationsPage from '@/routes/regulations';
+import AskPage from '@/routes/ask';
+import CohortsPage from '@/routes/cohorts';
+import CohortNewPage from '@/routes/cohort-new';
+import DashboardsPage from '@/routes/dashboards';
+import DashboardNewPage from '@/routes/dashboard-new';
+import DashboardDetailPage from '@/routes/dashboard-detail';
+import InsightsPage from '@/routes/insights';
+import InsightDetailPage from '@/routes/insight-detail';
+import ActionsPage from '@/routes/actions';
+import CopilotsPage from '@/routes/copilots';
+import OfficersPage from '@/routes/officers';
+import OfficerDetailPage from '@/routes/officer-detail';
+import WorkforceAnalyticsPage from '@/routes/workforce';
 import NotFoundPage from '@/routes/not-found';
 
 import './styles/globals.css';
@@ -132,6 +142,21 @@ const router = createBrowserRouter([
       { path: 'audit', element: <AuditPage /> },
       { path: 'policies', element: <PoliciesPage /> },
       { path: 'regulations', element: <RegulationsPage /> },
+
+      // AI surfaces + Officer 360 + workforce (R9)
+      { path: 'ask', element: <AskPage /> },
+      { path: 'cohorts', element: <CohortsPage /> },
+      { path: 'cohorts/new', element: <CohortNewPage /> },
+      { path: 'dashboards', element: <DashboardsPage /> },
+      { path: 'dashboards/new', element: <DashboardNewPage /> },
+      { path: 'dashboards/:id', element: <DashboardDetailPage /> },
+      { path: 'insights', element: <InsightsPage /> },
+      { path: 'insights/:id', element: <InsightDetailPage /> },
+      { path: 'actions', element: <ActionsPage /> },
+      { path: 'copilots', element: <CopilotsPage /> },
+      { path: 'officers', element: <OfficersPage /> },
+      { path: 'officers/:id', element: <OfficerDetailPage /> },
+      { path: 'workforce-analytics', element: <WorkforceAnalyticsPage /> },
 
       { path: '*', element: <NotFoundPage /> },
     ],

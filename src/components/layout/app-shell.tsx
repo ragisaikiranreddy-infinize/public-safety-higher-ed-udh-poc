@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
+import { CommandPalette } from './command-palette';
 
 export function AppShell() {
   return (
@@ -14,6 +15,7 @@ export function AppShell() {
           </main>
         </div>
       </div>
+      <CommandPalette />
     </div>
   );
 }

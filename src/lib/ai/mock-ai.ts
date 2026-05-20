@@ -25,8 +25,11 @@
  *   - hazingClassifier(orgCaseId)       → Stop Campus Hazing classifier
  *   - ferpaDecisionAid(caseId)          → FERPA §99.31 decision aid
  *
- * Later phases extend:
- *   R9  — askPlatform, cohortFromNL, buildDashboardFromNL
+ * R9 surface — Polish, AI surfaces:
+ *   - askPlatform(prompt)               → NL→SQL grounded Q+A
+ *   - cohortFromNL(prompt)              → chip-pipeline cohort builder
+ *   - buildDashboardFromNL(prompt)      → AI dashboard builder
+ *   - expandInsight(insightId)          → narrative expansion w/ contributors
  */
 
 import type { Classification, RoleId } from '../types';
@@ -42,7 +45,7 @@ import {
   THREAD_C_ASR_LINE_ID,
   THREAD_C_FOIA_REQUEST_ID,
 } from '../../../mocks/threads';
-import type { CleryCrimeCategory, CleryGeographyClass } from '../types';
+import type { CleryCrimeCategory, CleryGeographyClass, DashboardWidget } from '../types';
 import { evaluateBarrier } from '../information-barriers';
 
 // =========================================================================
@@ -1112,6 +1115,386 @@ export interface AIFerpaDecisionAid {
     rationale: string;
   }[];
   headline: string;
+}
+
+// =========================================================================
+// askPlatform — NL→SQL grounded Q+A
+// =========================================================================
+
+export interface AIAskResult {
+  available: boolean;
+  /** Headline answer (1-2 sentences). */
+  answer: string;
+  /** Generated SQL (read-only, against the medallion catalog). */
+  sql: string;
+  /** Tabular result preview (column headers + a few rows). */
+  resultPreview: {
+    columns: string[];
+    rows: (string | number)[][];
+  };
+  /** Citations to datasets / records that ground the answer. */
+  citations: AICitation[];
+  /** Confidence 0..100. */
+  confidence: number;
+  /** Streaming-plan tokens for the demo. */
+  streamingPlan: { text: string; delayMs: number }[];
+}
+
+/**
+ * Intent-router for /ask prompts. Three canned answers tied to the threads;
+ * generic deflection for everything else.
+ */
+export function askPlatform(prompt: string): AIAskResult {
+  const q = prompt.toLowerCase().trim();
+
+  if (q.includes('after-hours') || q.includes('after hours') || (q.includes('swipe') && q.includes('carter'))) {
+    return {
+      available: true,
+      answer:
+        '47 after-hours card-swipes at DOR-CARTER-MAIN-S over the past 60 days, by a single cardholder (PER-008470) ' +
+        'who does not reside in Carter Hall. Pattern peaks 22:00–02:00.',
+      sql:
+        `SELECT cardholder_id, COUNT(*) AS swipe_count, MIN(at) AS first_seen, MAX(at) AS last_seen
+FROM access.events_normalized
+WHERE building_id = 'BLD-CARTER-HALL'
+  AND door_id = 'DOR-CARTER-MAIN-S'
+  AND is_after_hours = TRUE
+  AND is_unusual_building = TRUE
+  AND at >= CURRENT_DATE - INTERVAL '60 days'
+GROUP BY cardholder_id
+ORDER BY swipe_count DESC
+LIMIT 5;`,
+      resultPreview: {
+        columns: ['cardholder_id', 'swipe_count', 'first_seen', 'last_seen'],
+        rows: [
+          ['OC-44192 (→ PER-008470)', 47, '~58 days ago', '~2 days ago'],
+          ['OC-19237', 3, '~12 days ago', '~5 days ago'],
+          ['OC-08810', 1, '~22 days ago', '~22 days ago'],
+        ],
+      },
+      citations: [
+        { kind: 'dataset', refId: 'access.events_normalized', label: 'access.events_normalized', linkedRoute: '/catalog/access.events_normalized', classification: 'pii' },
+        { kind: 'access-anomaly', refId: 'ACS-CARTER-CLUSTER', label: 'Open Building Intelligence Overlay', linkedRoute: '/access/buildings/BLD-CARTER-HALL', classification: 'pii' },
+      ],
+      confidence: 94,
+      streamingPlan: [
+        { text: 'Parsing NL prompt', delayMs: 200 },
+        { text: '… resolving entities (Carter Hall · after-hours · swipes)', delayMs: 240 },
+        { text: '… selecting dataset (access.events_normalized)', delayMs: 240 },
+        { text: '… generating SQL', delayMs: 320 },
+        { text: '… executing query', delayMs: 280 },
+        { text: 'Done.', delayMs: 180 },
+      ],
+    };
+  }
+
+  if (q.includes('open incident') || q.includes('open incidents') || q.includes('right now')) {
+    return {
+      available: true,
+      answer: 'There are open incidents across all classifications right now. Most are routine welfare-checks and noise complaints; the active EOC activation (EOC-2026-013) is the only critical-priority item.',
+      sql:
+        `SELECT status, priority, COUNT(*) AS n
+FROM incidents.conformed
+WHERE status IN ('open', 'on-scene', 'pending')
+GROUP BY status, priority
+ORDER BY priority;`,
+      resultPreview: {
+        columns: ['status', 'priority', 'n'],
+        rows: [
+          ['open', 1, 1],
+          ['on-scene', 2, 3],
+          ['open', 3, 12],
+          ['pending', 4, 6],
+        ],
+      },
+      citations: [
+        { kind: 'dataset', refId: 'incidents.conformed', label: 'incidents.conformed', linkedRoute: '/catalog/incidents.conformed', classification: 'cji' },
+      ],
+      confidence: 88,
+      streamingPlan: [
+        { text: 'Parsing NL prompt', delayMs: 200 },
+        { text: '… selecting dataset (incidents.conformed)', delayMs: 240 },
+        { text: '… generating SQL', delayMs: 280 },
+        { text: '… executing query', delayMs: 280 },
+        { text: 'Done.', delayMs: 180 },
+      ],
+    };
+  }
+
+  if (q.includes('asr') || q.includes('clery completeness') || q.includes('annual security')) {
+    return {
+      available: true,
+      answer:
+        '2025 ASR is 73% complete (58 / 80 cells reviewed). The Thread C cell — Sex Offenses · On-Campus Residential — is reviewed with 3 source incidents linked.',
+      sql:
+        `SELECT
+  COUNT(*) FILTER (WHERE status IN ('reviewed', 'submitted')) AS reviewed,
+  COUNT(*) AS total
+FROM mart.clery_asr_workspace
+WHERE reporting_year = 2025;`,
+      resultPreview: {
+        columns: ['reviewed', 'total'],
+        rows: [[58, 80]],
+      },
+      citations: [
+        { kind: 'dataset', refId: 'mart.clery_asr_workspace', label: 'mart.clery_asr_workspace', linkedRoute: '/catalog/mart.clery_asr_workspace', classification: 'public' },
+        { kind: 'dataset', refId: 'ASR-2025-RESHALL-SEXOFF', label: 'Open ASR workbench →', linkedRoute: '/clery/asr/2025', classification: 'public' },
+      ],
+      confidence: 91,
+      streamingPlan: [
+        { text: 'Parsing NL prompt', delayMs: 200 },
+        { text: '… selecting dataset (mart.clery_asr_workspace)', delayMs: 240 },
+        { text: '… generating SQL', delayMs: 280 },
+        { text: '… executing query', delayMs: 240 },
+        { text: 'Done.', delayMs: 180 },
+      ],
+    };
+  }
+
+  return {
+    available: true,
+    answer:
+      'I can answer questions grounded in the medallion catalog. Try: "after-hours swipes at Carter Hall", "open incidents right now", or "2025 ASR completeness".',
+    sql: '-- no query generated; ask a more specific question',
+    resultPreview: { columns: [], rows: [] },
+    citations: [],
+    confidence: 0,
+    streamingPlan: [{ text: 'Awaiting a more specific prompt…', delayMs: 200 }],
+  };
+}
+
+// =========================================================================
+// cohortFromNL — NL prompt → chip-pipeline cohort
+// =========================================================================
+
+export interface AICohortBuildResult {
+  available: boolean;
+  /** Suggested cohort name. */
+  name: string;
+  /** Predicate chips. */
+  chips: { id: string; label: string; kind: 'filter' | 'aggregate' | 'window' | 'threshold' }[];
+  /** Sample resolved member IDs. */
+  sampleMemberIds: string[];
+  /** Estimated count. */
+  estimatedCount: number;
+  /** Datasets the cohort would read from. */
+  datasets: string[];
+  /** Confidence 0..100. */
+  confidence: number;
+}
+
+export function cohortFromNL(prompt: string): AICohortBuildResult {
+  const q = prompt.toLowerCase().trim();
+
+  if (q.includes('multi-signal') || q.includes('after-hours') || q.includes('carter')) {
+    return {
+      available: true,
+      name: 'Multi-signal subjects at residence halls (90d)',
+      chips: [
+        { id: 'c1', label: 'Persons with after-hours residence-hall swipes', kind: 'filter' },
+        { id: 'c2', label: '≥ 10 swipes in 60 days', kind: 'aggregate' },
+        { id: 'c3', label: 'At a building they do not reside in', kind: 'filter' },
+        { id: 'c4', label: '+ camera loitering events on same camera', kind: 'filter' },
+        { id: 'c5', label: '+ ≥ 3 anonymous tips matched by device-id', kind: 'aggregate' },
+      ],
+      sampleMemberIds: ['PER-008470'],
+      estimatedCount: 1,
+      datasets: ['access.events_normalized', 'vms.events_normalized', 'tips.anonymous_raw', 'mart.bit_case_briefing_features'],
+      confidence: 92,
+    };
+  }
+
+  if (q.includes('officer') && (q.includes('load') || q.includes('training'))) {
+    return {
+      available: true,
+      name: 'Officers — high incident load + low training hours',
+      chips: [
+        { id: 'c1', label: 'YTD primary-on incidents > 80', kind: 'aggregate' },
+        { id: 'c2', label: 'Training hours YTD < 24', kind: 'filter' },
+      ],
+      sampleMemberIds: ['OFC-0124', 'OFC-0130', 'OFC-0145'],
+      estimatedCount: 3,
+      datasets: ['mart.officer_workload_daily'],
+      confidence: 86,
+    };
+  }
+
+  return {
+    available: true,
+    name: 'New cohort',
+    chips: [{ id: 'c1', label: prompt, kind: 'filter' }],
+    sampleMemberIds: [],
+    estimatedCount: 0,
+    datasets: [],
+    confidence: 35,
+  };
+}
+
+// =========================================================================
+// buildDashboardFromNL — NL prompt → staggered dashboard
+// =========================================================================
+
+export interface AIDashboardBuildResult {
+  available: boolean;
+  name: string;
+  widgets: DashboardWidget[];
+  rationale: string;
+  confidence: number;
+}
+
+export function buildDashboardFromNL(prompt: string): AIDashboardBuildResult {
+  const q = prompt.toLowerCase().trim();
+
+  if (q.includes('eoc') || q.includes('activation') || q.includes('runbook')) {
+    return {
+      available: true,
+      name: 'EOC operational readiness',
+      rationale: 'Prompt referenced EOC + activations. Building a 6-widget grid with KPIs + delivery line chart + open-activations table.',
+      confidence: 92,
+      widgets: [
+        { id: 'w1', kind: 'kpi', title: 'Active activations', span: 3, staggerMs: 0, value: '1', hint: 'partial level' },
+        { id: 'w2', kind: 'kpi', title: 'Buildings in lockdown', span: 3, staggerMs: 200, value: '4', hint: 'under EOC-2026-013' },
+        { id: 'w3', kind: 'kpi', title: 'Delivery rate (30d)', span: 3, staggerMs: 400, value: '96.4%', hint: 'P95 11s SMS' },
+        { id: 'w4', kind: 'kpi', title: 'Generators not normal', span: 3, staggerMs: 600, value: '1', hint: '1 failed (WW4)' },
+        { id: 'w5', kind: 'line-chart', title: 'Campaigns sent (90d)', span: 6, staggerMs: 800, sparkline: [3, 1, 0, 2, 4, 1, 0, 1, 2, 3, 1, 2, 0, 1, 4, 2, 1, 0, 2, 1, 3, 1, 0, 2, 4, 1, 0, 1, 2, 3] },
+        { id: 'w6', kind: 'table', title: 'Open activations', span: 6, staggerMs: 1000, hint: '1 row · EOC-2026-013 / partial / 17m elapsed' },
+      ],
+    };
+  }
+
+  if (q.includes('clery') || q.includes('asr') || q.includes('annual security')) {
+    return {
+      available: true,
+      name: 'Clery — ASR overview',
+      rationale: 'Prompt referenced Clery / ASR. Building a 6-widget grid with completeness KPIs + status bar chart + geography donut.',
+      confidence: 89,
+      widgets: [
+        { id: 'w1', kind: 'kpi', title: 'ASR completeness (2025)', span: 3, staggerMs: 0, value: '73%', hint: '58 / 80 cells' },
+        { id: 'w2', kind: 'kpi', title: 'Timely Warnings (12mo)', span: 3, staggerMs: 200, value: '5 issued', hint: 'avg 39m to issue' },
+        { id: 'w3', kind: 'kpi', title: 'FOIA open', span: 3, staggerMs: 400, value: '11', hint: '1 past due' },
+        { id: 'w4', kind: 'kpi', title: 'NIBRS last submit', span: 3, staggerMs: 600, value: 'accepted', hint: 'M-03-2026' },
+        { id: 'w5', kind: 'bar-chart', title: 'ASR cells by status', span: 8, staggerMs: 800, sparkline: [58, 4, 12, 6], hint: 'reviewed · awaiting · open · submitted' },
+        { id: 'w6', kind: 'donut', title: 'Clery geography mix', span: 4, staggerMs: 1000, sparkline: [36, 8, 1, 3] },
+      ],
+    };
+  }
+
+  if (q.includes('bit') || q.includes('care') || q.includes('nabita')) {
+    return {
+      available: true,
+      name: 'BIT weekly review',
+      rationale: 'Prompt referenced BIT / NaBITA. Building a 6-widget grid with tier counts + tier movement + reviews-due + recent insights.',
+      confidence: 90,
+      widgets: [
+        { id: 'w1', kind: 'kpi', title: 'Open cases', span: 3, staggerMs: 0, value: '23', hint: 'all tiers' },
+        { id: 'w2', kind: 'kpi', title: 'Critical + elevated', span: 3, staggerMs: 200, value: '5', hint: '1c · 4e' },
+        { id: 'w3', kind: 'kpi', title: 'Reviews due this week', span: 3, staggerMs: 400, value: '7', hint: 'BIT-2026-0067 included' },
+        { id: 'w4', kind: 'kpi', title: 'Tier changes (7d)', span: 3, staggerMs: 600, value: '4' },
+        { id: 'w5', kind: 'donut', title: 'Cases by NaBITA tier', span: 4, staggerMs: 800, sparkline: [1, 4, 10, 8] },
+        { id: 'w6', kind: 'insight-feed', title: 'Recent Thread A insights', span: 8, staggerMs: 1000, hint: '3 RCA / prediction / anomaly insights' },
+      ],
+    };
+  }
+
+  return {
+    available: true,
+    name: 'Custom dashboard',
+    rationale: 'Prompt did not map to a known template; generated a 4-KPI starter grid.',
+    confidence: 40,
+    widgets: [
+      { id: 'w1', kind: 'kpi', title: 'KPI 1', span: 3, staggerMs: 0, value: '—' },
+      { id: 'w2', kind: 'kpi', title: 'KPI 2', span: 3, staggerMs: 200, value: '—' },
+      { id: 'w3', kind: 'kpi', title: 'KPI 3', span: 3, staggerMs: 400, value: '—' },
+      { id: 'w4', kind: 'kpi', title: 'KPI 4', span: 3, staggerMs: 600, value: '—' },
+    ],
+  };
+}
+
+// =========================================================================
+// expandInsight — narrative expansion + next-step recommendations
+// =========================================================================
+
+export interface AIInsightExpansion {
+  available: boolean;
+  insightId: string;
+  /** Extended narrative paragraph. */
+  expandedNarrative: string;
+  /** Recommended next steps. */
+  recommendedActions: { description: string; ownerRole: RoleId; horizonHours: number }[];
+  /** Linked routes for quick navigation. */
+  quickLinks: { label: string; route: string }[];
+}
+
+export function expandInsight(insightId: string): AIInsightExpansion {
+  // Three canned expansions for the Thread A insight IDs; deflection otherwise.
+  if (insightId === 'INS-THREAD-A-RCA') {
+    return {
+      available: true,
+      insightId,
+      expandedNarrative:
+        'The convergence is the pattern. Five independent data signals — access-control swipes, camera analytics, anonymous tips, ' +
+        'prior conduct cases, and an LMS engagement drop — all point to the same six-month window centered on BLD-CARTER-HALL. ' +
+        'No single signal would clear a threshold on its own. The platform\'s identity-resolution graph + the BIT case-feature ' +
+        'mart are the surfaces that made the joining feasible. Recommended next step: bring the case into next week\'s BIT review ' +
+        'with the supportive-measure coordination already pre-staged with Title IX.',
+      recommendedActions: [
+        { description: 'Add BIT-2026-0067 to next week\'s standing meeting agenda', ownerRole: 'bit-chair', horizonHours: 120 },
+        { description: 'Verify supportive-measure overlap with Title IX coordinator', ownerRole: 'title-ix-coordinator', horizonHours: 72 },
+        { description: 'Continue welfare-check cadence on building of concern', ownerRole: 'chief-of-police', horizonHours: 168 },
+      ],
+      quickLinks: [
+        { label: 'Open BIT case', route: '/bit/BIT-2026-0067' },
+        { label: 'Subject person 360', route: '/persons/PER-008470' },
+        { label: 'Building intelligence overlay', route: '/access/buildings/BLD-CARTER-HALL' },
+      ],
+    };
+  }
+
+  if (insightId === 'INS-THREAD-A-RISK') {
+    return {
+      available: true,
+      insightId,
+      expandedNarrative:
+        'The classifier scored Subject + Target dimensions in the upper-moderate band with Precipitating Events trending up. ' +
+        'A 30-day forward projection — given current support-plan actions — flattens the trajectory within 14 days. Without ' +
+        'intervention the model projects continued escalation. Recommended next step: accelerate the support-plan timeline and ' +
+        'consider an escalation to active-review status.',
+      recommendedActions: [
+        { description: 'Schedule BIT team review within 5 days', ownerRole: 'bit-chair', horizonHours: 120 },
+        { description: 'Outreach call to subject — voluntary counseling referral', ownerRole: 'dean-of-students', horizonHours: 72 },
+      ],
+      quickLinks: [
+        { label: 'Open BIT case', route: '/bit/BIT-2026-0067' },
+        { label: 'Run AI briefing', route: '/persons/PER-008470' },
+      ],
+    };
+  }
+
+  if (insightId === 'INS-THREAD-A-ANOM') {
+    return {
+      available: true,
+      insightId,
+      expandedNarrative:
+        'The anomaly is the single-cardholder concentration. Of the 47 unusual-building events at DOR-CARTER-MAIN-S in the past ' +
+        '60 days, all 47 are attributable to a single OneCard token. The next-highest cardholder generated 3 events. The cadence ' +
+        'has tightened — from one event every 4–5 days to one every 36 hours in the last two weeks.',
+      recommendedActions: [
+        { description: 'Review camera footage from the most-recent two events', ownerRole: 'chief-of-police', horizonHours: 48 },
+      ],
+      quickLinks: [
+        { label: 'Building intelligence overlay', route: '/access/buildings/BLD-CARTER-HALL' },
+        { label: 'Camera detail', route: '/cameras/CAM-CARTER-N3' },
+      ],
+    };
+  }
+
+  return {
+    available: true,
+    insightId,
+    expandedNarrative: 'No detailed expansion available for this insight in R9. The corpus expands in production.',
+    recommendedActions: [],
+    quickLinks: [],
+  };
 }
 
 export function ferpaDecisionAid(caseId: string): AIFerpaDecisionAid {
